@@ -29,7 +29,7 @@
     </div>
 
     <!-- 主角色选择界面 (v2.0.0) -->
-    <div class="char-selection" id="charSelection" style="display: none;">
+    <div class="char-selection hidden" id="charSelection">
         <div class="menu-bg-overlay"></div>
         <div class="char-panel glass-wrap">
             <h2 class="menu-title serif" id="charSelectTitle">--</h2>
@@ -73,7 +73,7 @@
     </div>
 
     <!-- 主菜单界面 -->
-    <div class="main-menu" id="mainMenu" style="display: none;">
+    <div class="main-menu hidden" id="mainMenu">
         <div class="menu-bg-overlay"></div>
         <div class="menu-content glass-wrap">
             <h2 class="menu-title serif" id="mainMenuTitle">--</h2>
@@ -106,9 +106,9 @@
     </div>
 
     <!-- 队伍配置界面 (v2.5.2 抛光) -->
-    <div class="ai-selection" id="aiSelection" style="display: none;">
+    <div class="ai-selection hidden" id="aiSelection">
         <div class="menu-bg-overlay"></div>
-        <div class="menu-content glass-wrap" style="max-width: 500px; position: relative; padding-top: 60px;">
+        <div class="menu-content glass-wrap">
             <!-- 返回按钮移至左上角 -->
             <button class="menu-back-btn" id="cancelAiBtn">
                 <span class="btn-icon">↩</span>
@@ -131,7 +131,7 @@
                 <div id="aiStrategyContainer"></div>
             </div>
 
-            <div class="menu-buttons" style="margin-top:30px; display: flex; justify-content: center;">
+            <div class="menu-buttons flex-center">
                 <button class="menu-btn primary small-btn" id="confirmAiBtn">
                     <span class="btn-text">确认队伍</span>
                 </button>
@@ -213,7 +213,7 @@
                 <div class="battle-line">
                     <div class="battle-header">
                         <div class="field-title"></div>
-                        <div class="char-badge" id="hudCharBadge" style="display: none;">
+                        <div class="char-badge hidden" id="hudCharBadge">
                             <img src="assets/char_chosen_one.png" alt="Character Avatar" class="char-avatar"
                                 id="hudCharPortrait">
                             <span class="name" id="hudCharName">--</span>
@@ -223,8 +223,8 @@
                     <div class="field-cards" id="fieldCards"></div>
                 </div>
 
-                <div id="gameMessage" style="display:none;"></div>
-                <div class="combo-info" id="comboInfo" style="display:none;"></div>
+                <div id="gameMessage" class="hidden"></div>
+                <div class="combo-info hidden" id="comboInfo"></div>
             </main>
 
             <!-- 右侧日志区域 -->
@@ -256,7 +256,7 @@
                     </div>
 
                     <!-- 防御阶段面板 (Inline) -->
-                    <div class="defense-status" id="defensePanel" style="display: none;">
+                    <div class="defense-status hidden" id="defensePanel">
                         <div class="defense-info-mini">
                             <div class="v-box">
                                 <span class="v-label">--</span>
@@ -275,7 +275,7 @@
     </div>
 
     <!-- 游戏结束模态框 -->
-    <div class="modal" id="gameOverModal" style="display: none;">
+    <div class="modal hidden" id="gameOverModal">
         <div class="modal-content">
             <h2 id="gameOverTitle"></h2>
             <p id="gameOverMessage"></p>

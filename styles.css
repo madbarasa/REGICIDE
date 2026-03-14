@@ -1820,19 +1820,39 @@ body {
     border: none !important;
 }
 
-/* 2. 战场区域层级与间距优化：提升层级，并确保与底部手牌区有物理间隔，不产生重叠 */
+/* 2. 战场区域层级与间距优化：恢复 flex: 2 以支持侧边栏恢复 */
 .tabletop {
     position: relative;
     z-index: 50 !important; /* 确保在 UI 之上 */
     padding-bottom: 30px !important; /* 增加底部弹性间距，防止触碰到缩小的手牌 */
-    height: auto !important; /* 允许高度根据内容自适应，不强制 flex: 1 到底 */
-    flex: none !important;
-    width: 100%;
+    flex: 2 !important; /* 恢复三栏比例，不再强制 100% 宽度 */
+    min-width: 0;
 }
 
 .game-main-layout {
-    align-items: center !important; /* 战场水平居中 */
+    align-items: stretch !important; /* 穿透式对齐，供侧边栏自适应高度 */
     justify-content: center !important;
+}
+
+/* 3. 规范化迁移自 index.html 的内联样式 (v2.5.6) */
+.hidden {
+    display: none !important;
+}
+
+#aiSelection .menu-content {
+    max-width: 500px;
+    position: relative;
+    padding-top: 60px;
+}
+
+#aiSelection .menu-buttons {
+    margin-top: 30px;
+}
+
+.flex-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 /* 3. 队友盒子透明度微调，既能看清文字又不遮挡背景纹理 */
