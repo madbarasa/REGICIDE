@@ -1805,3 +1805,49 @@ body {
 .shield .counter-value {
     color: #4ecdc4;
 }
+/* --- UI/UX Structural Fix v2.5.5 --- */
+
+/* 1. 彻底移除战场及其父容器的所有背景限制，确保主体背景纹理全局可见 */
+.game-main-layout, 
+.tabletop, 
+.game-board, 
+.center-stage, 
+.battle-line,
+.teammates-zone {
+    background: none !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* 2. 战场区域层级与间距优化：提升层级，并确保与底部手牌区有物理间隔，不产生重叠 */
+.tabletop {
+    position: relative;
+    z-index: 50 !important; /* 确保在 UI 之上 */
+    padding-bottom: 30px !important; /* 增加底部弹性间距，防止触碰到缩小的手牌 */
+    height: auto !important; /* 允许高度根据内容自适应，不强制 flex: 1 到底 */
+    flex: none !important;
+    width: 100%;
+}
+
+.game-main-layout {
+    align-items: center !important; /* 战场水平居中 */
+    justify-content: center !important;
+}
+
+/* 3. 队友盒子透明度微调，既能看清文字又不遮挡背景纹理 */
+.teammate-box {
+    background: rgba(0, 0, 0, 0.2) !important; /* 减淡背景 */
+    backdrop-filter: blur(5px);
+}
+
+/* 4. 手牌区层级调低，确保它真的在底层悬浮 */
+.player-station {
+    z-index: 5 !important;
+    position: relative;
+}
+
+/* 5. 修正 Boss 水印，确保它不会让背景看起来黑乎乎的一团 */
+.center-stage::before {
+    opacity: 0.1 !important; /* 进一步降低水印干扰 */
+}
