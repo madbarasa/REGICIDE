@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title></title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Cardo:wght@400;700&family=Inter:wght@300;400;700;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- 开始游戏画面 -->
+    <div class="start-screen" id="startScreen">
+        <div class="start-screen-inner">
+            <!-- 修复路径：使用本地生成的 startup_bg.png -->
+            <img src="startup_bg.png" class="start-screen-image-bg" id="startScreenImage">
+            <div class="start-content-overlay">
+                <div class="start-screen-title serif">--</div>
+                <div class="start-screen-subtitle">--</div>
+                <div class="start-prompt-wrap">
+                    <div class="start-screen-hint">--</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主角色选择界面 (v2.0.0) -->
+    <div class="char-selection" id="charSelection" style="display: none;">
+        <div class="menu-bg-overlay"></div>
+        <div class="char-panel glass-wrap">
+            <h2 class="menu-title serif" id="charSelectTitle">--</h2>
+            <div class="char-layout">
+                <div class="char-portrait-box">
+                    <button class="nav-btn prev" id="prevCharBtn">◀</button>
+                    <img id="charPortrait" src="assets/char_chosen_one.png" alt="Portrait">
+                    <div class="char-lv-badge">Lv.<span id="charLevel">1</span></div>
+                    <button class="nav-btn next" id="nextCharBtn">▶</button>
+                </div>
+                <div class="char-info-box">
+                    <h3 id="charName" class="serif">--</h3>
+                    <div class="char-bio" id="charBio">--</div>
+                <div class="char-ability-list">
+                        <h4>--</h4>
+                        <div class="ability-item" id="abilityLv1">
+                            <span class="lv-tag">Lv.1</span>
+                            <span class="text">--</span>
+                        </div>
+                        <div class="ability-item" id="abilityLv2">
+                            <span class="lv-tag">Lv.2</span>
+                            <span class="text">--</span>
+                        </div>
+                        <div class="ability-item" id="abilityLv3">
+                            <span class="lv-tag">Lv.3</span>
+                            <span class="text">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="char-footer">
+                <div class="win-progression">
+                    <span class="label">--</span>
+                    <span id="charWins" class="val">0</span>
+                </div>
+                <button class="menu-btn primary" id="confirmCharBtn">
+                    <span class="btn-text">--</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主菜单界面 -->
+    <div class="main-menu" id="mainMenu" style="display: none;">
+        <div class="menu-bg-overlay"></div>
+        <div class="menu-content glass-wrap">
+            <h2 class="menu-title serif" id="mainMenuTitle">--</h2>
+            <div class="menu-divider"></div>
+            <div class="menu-buttons">
+                <button class="menu-btn adventure" id="adventureBtn">
+                    <span class="btn-icon">🛡️</span>
+                    <div class="btn-text-group">
+                        <span class="btn-text">--</span>
+                        <span class="btn-desc">--</span>
+                    </div>
+                    <div class="btn-hover-fx"></div>
+                </button>
+                <button class="menu-btn online" id="onlineBtn">
+                    <span class="btn-icon">🌐</span>
+                    <div class="btn-text-group">
+                        <span class="btn-text">--</span>
+                        <span class="btn-desc">--</span>
+                    </div>
+                </button>
+                <button class="menu-btn achievements" id="achievementsBtn">
+                    <span class="btn-icon">🏆</span>
+                    <div class="btn-text-group">
+                        <span class="btn-text">--</span>
+                        <span class="btn-desc">--</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <!-- 顶部信息 -->
+        <header class="top-info">
+            <div class="phase-indicator" id="phaseIndicator">--</div>
+            <div class="top-right-group">
+                <div class="version-tag"></div>
+            </div>
+        </header>
+
+        <div class="game-main-layout">
+            <!-- 左侧规则区域 -->
+            <aside class="side-panel rules-panel">
+                <h3 class="serif" id="rulesTitle">--</h3>
+                <div class="rules-content">
+                    <!-- 动态生成 -->
+                </div>
+            </aside>
+
+            <!-- 中间战场区域 -->
+            <main class="tabletop game-board">
+                <div class="center-stage">
+                    <div class="deck-area">
+                        <div class="deck-pile player-deck">
+                            <div class="pile-count" id="playerDeckCount">44</div>
+                            <div class="pile-label">--</div>
+                        </div>
+                        <div class="deck-pile discard-pile">
+                            <div class="pile-count" id="discardCount">0</div>
+                            <div class="pile-label">--</div>
+                        </div>
+                    </div>
+
+                    <div class="boss-zone" id="currentBoss">
+                        <div class="boss-card">
+                            <div class="boss-card-inner">
+                                <div class="card-suit" id="bossSuit">?</div>
+                                <div class="card-rank" id="bossRank">?</div>
+                                <div id="bossImmunity" class="immunity-badge"></div>
+                            </div>
+                        </div>
+
+                        <div class="boss-stats-display">
+                            <div class="stat-counter hp">
+                            <div class="counter-label">--</div>
+                                <div class="counter-value" id="bossHealthText">--</div>
+                                <div class="counter-bar">
+                                    <div class="fill" id="bossHealthFill"></div>
+                                </div>
+                            </div>
+                            <div class="stat-counter atk">
+                            <div class="counter-label">--</div>
+                                <div class="counter-value" id="bossAttack">--</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="opponent-deck">
+                        <div class="deck-pile boss-deck">
+                            <div class="pile-count" id="bossDeckCount">12</div>
+                            <div class="pile-label">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="battle-line">
+                    <div class="battle-header">
+                        <div class="field-title"></div>
+                        <div class="char-badge" id="hudCharBadge" style="display: none;">
+                            <img src="assets/char_chosen_one.png" alt="Character Avatar" class="char-avatar"
+                                id="hudCharPortrait">
+                            <span class="name" id="hudCharName">--</span>
+                            <span class="lv" id="hudCharLv">--</span>
+                        </div>
+                    </div>
+                    <div class="field-cards" id="fieldCards"></div>
+                </div>
+
+                <div id="gameMessage" style="display:none;"></div>
+                <div class="combo-info" id="comboInfo" style="display:none;"></div>
+            </main>
+
+            <!-- 右侧日志区域 -->
+            <aside class="side-panel logs-panel">
+                <h3 class="serif" id="logsTitle">--</h3>
+                <div class="game-log" id="gameLog"></div>
+            </aside>
+        </div>
+
+        <!-- 玩家区域 (Refactored for v1.9.0) -->
+        <footer class="player-station">
+            <div class="player-station-inner">
+                <!-- 手牌区 -->
+                <div class="hand-wrapper">
+                    <div class="hand-container" id="playerHand"></div>
+                </div>
+
+                <!-- 侧边操作面板 -->
+                <aside class="side-controls" id="sideControls">
+                    <!-- 进攻阶段按钮 -->
+                    <div class="action-btns" id="actionButtons">
+                        <button class="table-btn primary" id="playCardBtn">--</button>
+                        <button class="table-btn secondary" id="skipTurnBtn">--</button>
+                        <button class="table-btn joker" id="jokerBtn">
+                            <span class="icon">🃏</span>
+                            <span class="text"><span id="jokerSkillName">--</span> (<span
+                                    id="jokerCountText">0</span>)</span>
+                        </button>
+                    </div>
+
+                    <!-- 防御阶段面板 (Inline) -->
+                    <div class="defense-status" id="defensePanel" style="display: none;">
+                        <div class="defense-info-mini">
+                            <div class="v-box">
+                                <span class="v-label">--</span>
+                                <span class="v-num" id="requiredDefense">0</span>
+                            </div>
+                            <div class="v-box">
+                                <span class="v-label">--</span>
+                                <span class="v-num" id="currentDefenseValue">0</span>
+                            </div>
+                        </div>
+                        <button class="table-btn primary" id="confirmDefenseBtn" disabled>--</button>
+                    </div>
+                </aside>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 游戏结束模态框 -->
+    <div class="modal" id="gameOverModal" style="display: none;">
+        <div class="modal-content">
+            <h2 id="gameOverTitle"></h2>
+            <p id="gameOverMessage"></p>
+            <button class="table-btn primary" id="restartGameBtn">--</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+
+</html>
