@@ -16,7 +16,7 @@
 // 1. CONFIG & CONSTANTS
 // =============================================================================
 const CONFIG = {
-    VERSION: '2.5.3',
+    VERSION: '2.5.4',
     CARD_VALUES: {
         'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
         'J': 10, 'Q': 15, 'K': 20, 'JOKER': 0
@@ -222,6 +222,7 @@ const elements = {
     bossSuit: document.getElementById('bossSuit'),
     bossRank: document.getElementById('bossRank'),
     bossImmunity: document.getElementById('bossImmunity'), // 新增免疫角标
+    bossShield: document.getElementById('bossShield'), // [NEW] (v2.5.4)
     bossDeckCount: document.getElementById('bossDeckCount'),
     playerDeckCount: document.getElementById('playerDeckCount'),
     discardCount: document.getElementById('discardCount'),
@@ -1220,6 +1221,9 @@ function applyStaticUI() {
     if (hpLabel) hpLabel.textContent = t.STATS.HEALTH;
     const atkLabel = document.querySelector('.atk .counter-label');
     if (atkLabel) atkLabel.textContent = t.STATS.ATTACK;
+    const shieldLabel = document.querySelector('.shield .counter-label');
+    if (shieldLabel) shieldLabel.textContent = t.STATS.FIELD;
+    
     const fieldTitle = document.querySelector('.field-title');
     // if (fieldTitle) fieldTitle.textContent = t.STATS.FIELD;
 
@@ -1336,6 +1340,7 @@ function updateShieldEffect() {
     const shieldValue = getTotalShieldValue();
     gameState.currentBoss.currentATK = Math.max(0, gameState.currentBoss.baseATK - shieldValue);
     elements.bossAttack.textContent = gameState.currentBoss.currentATK;
+    if (elements.bossShield) elements.bossShield.textContent = shieldValue;
 }
 
 function updateImmunityIndicator(bossSuit) {

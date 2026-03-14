@@ -1768,3 +1768,40 @@ body {
     transform: scale(0.85); /* 稍微再缩小一点点，确保在大视野下更和谐 */
     transform-origin: bottom center;
 }
+/* --- UI Polish v2.5.4 Fixes --- */
+
+/* 1. 队伍配置确认按钮：缩小 1/2 并居中 */
+#confirmAiBtn.small-btn {
+    width: 160px !important; /* 原本可能是 320px 左右或满宽 */
+    min-width: 160px !important;
+    margin: 20px auto !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+}
+
+/* 2. 中央战场 (红色框区域) 彻底透明化 */
+.tabletop, .game-board {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.center-stage {
+    background: transparent !important;
+}
+
+/* 确保内部没有杂余的背景层 */
+.battle-line {
+    background: transparent !important;
+}
+
+/* 3. 护盾显示位美化 (蓝色系) */
+.stat-counter.shield {
+    border-color: #4ecdc4;
+}
+.shield .counter-value {
+    color: #4ecdc4;
+}
