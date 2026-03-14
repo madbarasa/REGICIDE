@@ -16,7 +16,7 @@
 // 1. CONFIG & CONSTANTS
 // =============================================================================
 const CONFIG = {
-    VERSION: '2.4.4',
+    VERSION: '2.5.3',
     CARD_VALUES: {
         'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
         'J': 10, 'Q': 15, 'K': 20, 'JOKER': 0
@@ -263,6 +263,9 @@ const elements = {
     // [NEW] AI 配置界面元素
     aiSelection: document.getElementById('aiSelection'),
     aiCountSelect: document.getElementById('aiCountSelect'),
+    manualExpandHandBtn: document.getElementById('manualExpandHandBtn'), // [NEW] (v2.5.2)
+    toastContainer: document.getElementById('toastContainer'), // [NEW] (v2.5.0)
+    teammatesZone: document.getElementById('teammatesZone'), // [NEW] (v2.5.0)
     aiStrategyContainer: document.getElementById('aiStrategyContainer'),
     confirmAiBtn: document.getElementById('confirmAiBtn'),
     cancelAiBtn: document.getElementById('cancelAiBtn'),
