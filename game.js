@@ -207,6 +207,10 @@ let currentBgmSrc = null;
 let charSelectionIndex = 0; // [NEW] 追踪当前选择的角色索引 (v2.4.0)
 const CHAR_IDS = ['CHOSEN_ONE', 'BARD']; // [NEW] 可选角色列表 (v2.4.0)
 
+// [NEW] AI 队友配置 (v2.5.0)
+// 数据结构示例: [{ id: 'AI_1', name: 'AI-1', strategy: 'balanced', isAI: true }]
+let selectedAIs = []; 
+
 const elements = {
     gameBoard: document.querySelector('.game-board'),
     phaseIndicator: document.getElementById('phaseIndicator'),
@@ -255,7 +259,15 @@ const elements = {
     confirmCharBtn: document.getElementById('confirmCharBtn'),
     adventureBtn: document.getElementById('adventureBtn'),
     onlineBtn: document.getElementById('onlineBtn'),
-    achievementsBtn: document.getElementById('achievementsBtn')
+    achievementsBtn: document.getElementById('achievementsBtn'),
+    // [NEW] AI 配置界面元素
+    aiSelection: document.getElementById('aiSelection'),
+    aiCountSelect: document.getElementById('aiCountSelect'),
+    aiStrategyContainer: document.getElementById('aiStrategyContainer'),
+    confirmAiBtn: document.getElementById('confirmAiBtn'),
+    cancelAiBtn: document.getElementById('cancelAiBtn'),
+    teammatesZone: document.getElementById('teammatesZone'),
+    manualExpandHandBtn: document.getElementById('manualExpandHandBtn')
 };
 
 // =============================================================================
@@ -456,6 +468,30 @@ function initGame() {
     const charId = gameState.character.id;
     const charData = CONFIG.CHARACTERS[charId];
 
+    // [NEW] 动态生成 players 数组
+    const totalPlayers = 1 + selectedAIs.length;
+    const maxHandSize = CONFIG.HAND_LIMIT[totalPlayers] || 5;
+    
+    const players = [{
+        id: 'player_1',
+        name: charData.name,
+        isAI: false,
+        hand: [],
+        maxHandSize: maxHandSize
+    }];
+
+    // 将选定的 AI 加入队伍
+    selectedAIs.forEach((aiConfig, index) => {
+        players.push({
+            id: aiConfig.id,
+            name: aiConfig.name,
+            isAI: true,
+            strategy: aiConfig.strategy,
+            hand: [],
+            maxHandSize: maxHandSize
+        });
+    });
+
     gameState = {
         ...gameState,
         character: {
@@ -465,11 +501,7 @@ function initGame() {
         },
         phase: 'TURN_START',
         currentPlayerIndex: 0,
-        players: [{
-            id: 'player_1',
-            hand: [],
-            maxHandSize: CONFIG.HAND_LIMIT[1]
-        }],
+        players: players,
         bossDeck: bossDeck,
         playerDeck: playerDeck,
         discardPile: [],
@@ -493,7 +525,10 @@ function initGame() {
         centerStage.style.setProperty('--boss-watermark', `url('${firstBossImgSrc}')`);
     }
 
-    drawCards(gameState.players[0], gameState.players[0].maxHandSize);
+    // 所有玩家抽满手牌
+    gameState.players.forEach(player => {
+        drawCards(player, player.maxHandSize);
+    });
     elements.gameLog.innerHTML = `<div class="log-entry">${CONFIG.UI_TEXT.LOGS.START}</div>`;
     elements.playCardBtn.textContent = CONFIG.UI_TEXT.BUTTONS.PLAY;
     elements.skipTurnBtn.textContent = CONFIG.UI_TEXT.BUTTONS.SKIP;
@@ -598,13 +633,13 @@ function validateCombo(cards) {
 }
 
 function executeCombo(cards) {
-    const player = gameState.players[0];
+    const player = gameState.players[gameState.currentPlayerIndex];
     let comboDamage = 0;
     let comboType = '';
     let comboSkills = new Set();
 
     const cardNames = cards.map(card => `${card.suit}${card.rank}`).join('+');
-    addLogEntry(`出牌: ${cardNames}`, 'skill');
+    addLogEntry(`${player.name} 出牌: ${cardNames}`, 'skill');
     playSound('playCard');
 
     cards.forEach(card => {
@@ -739,16 +774,13 @@ function executeCombo(cards) {
                 playSound('bossVictory');
                 addLogEntry(CONFIG.UI_TEXT.LOGS.BOSS_DEFEATED, 'error');
             }
-            gameState.phase = 'TURN_START';
-            updateUI();
+            passTurn();
             showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.NEW_BOSS_TOAST);
         }, 1500);
     } else {
         // [MOD] 延时 1.5s 进入防御阶段，避免与伤害飘字叠加
         setTimeout(() => {
-            gameState.phase = 'TAKE_DAMAGE';
-            updateUI();
-            showDefensePanel();
+            handleBossCounterAttack();
         }, 1500);
     }
 }
@@ -805,17 +837,17 @@ function confirmDefense() {
     }
 
     selectedCardsForDefense.forEach(selectedCard => {
-        const index = gameState.players[0].hand.findIndex(card => card.id === selectedCard.id);
+        const player = gameState.players[gameState.currentPlayerIndex];
+        const index = player.hand.findIndex(card => card.id === selectedCard.id);
         if (index !== -1) {
-            gameState.players[0].hand.splice(index, 1);
+            player.hand.splice(index, 1);
             gameState.discardPile.push(selectedCard);
         }
     });
 
     elements.defensePanel.style.display = 'none';
     elements.actionButtons.style.display = 'flex';
-    gameState.phase = 'TURN_START';
-    updateUI();
+    passTurn();
     showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.DEFENSE_SUCCESS);
     addLogEntry(CONFIG.UI_TEXT.LOGS.DEFENSE_SUCCESS, 'skill');
     selectedCardsForDefense = [];
@@ -823,10 +855,39 @@ function confirmDefense() {
 
 function skipTurn() {
     selectedCardsForCombo = [];
-    addLogEntry(`跳过出牌`, 'defense');
+    const player = gameState.players[gameState.currentPlayerIndex];
+    addLogEntry(`${player.name} 跳过出牌`, 'defense');
+    handleBossCounterAttack();
+}
+
+function handleBossCounterAttack() {
     gameState.phase = 'TAKE_DAMAGE';
     updateUI();
-    showDefensePanel();
+    const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+    if (currentPlayer.isAI) {
+        if (typeof triggerAITurn === 'function') {
+            setTimeout(() => triggerAITurn(), window.aiDelay || 1500);
+        }
+    } else {
+        showDefensePanel();
+    }
+}
+
+function passTurn() {
+    gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
+    gameState.phase = 'TURN_START';
+    updateUI();
+    
+    const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+    if (currentPlayer.isAI) {
+        if (typeof triggerAITurn === 'function') {
+            setTimeout(() => triggerAITurn(), window.aiDelay || 1500);
+        }
+    } else {
+        if (gameState.players.length > 1) {
+            showToastMessage('轮到你了！');
+        }
+    }
 }
 
 // =============================================================================
@@ -849,10 +910,62 @@ function showMainMenu() {
     // 监听主菜单按钮
     elements.adventureBtn.onclick = () => {
         hideMainMenu();
-        showCharSelection('CHOSEN_ONE'); // 默认进入角色选择
+        showAiSelection(); // [MOD] 先进入队伍配置
     };
     elements.onlineBtn.onclick = () => showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.ONLINE_WIP);
     elements.achievementsBtn.onclick = () => showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.ACHIEVEMENTS_WIP);
+}
+
+// [NEW] 显示 AI 队友配置界面
+function showAiSelection() {
+    elements.aiSelection.style.display = 'flex';
+    updateAiStrategySelectors(); // 根据当前数量初始化下拉框
+
+    elements.aiCountSelect.onchange = updateAiStrategySelectors;
+
+    elements.confirmAiBtn.onclick = () => {
+        saveAiConfiguration();
+        elements.aiSelection.style.display = 'none';
+        showCharSelection('CHOSEN_ONE'); // 选好队伍后再选人
+    };
+
+    elements.cancelAiBtn.onclick = () => {
+        elements.aiSelection.style.display = 'none';
+        showMainMenu();
+    };
+}
+
+function updateAiStrategySelectors() {
+    const count = parseInt(elements.aiCountSelect.value, 10);
+    elements.aiStrategyContainer.innerHTML = '';
+    
+    for (let i = 1; i <= count; i++) {
+        const row = document.createElement('div');
+        row.className = 'ai-config-row';
+        row.innerHTML = `
+            <span class="cfg-label">AI-${i} 策略:</span>
+            <select class="styled-select" id="aiStrategy_${i}">
+                <option value="balanced">平衡型 (Balanced)</option>
+                <option value="defensive">稳健型 (Defensive)</option>
+                <option value="aggressive">激进型 (Aggressive)</option>
+            </select>
+        `;
+        elements.aiStrategyContainer.appendChild(row);
+    }
+}
+
+function saveAiConfiguration() {
+    const count = parseInt(elements.aiCountSelect.value, 10);
+    selectedAIs = [];
+    for (let i = 1; i <= count; i++) {
+        const strategy = document.getElementById(`aiStrategy_${i}`).value;
+        selectedAIs.push({
+            id: `AI_${i}`,
+            name: `AI-${i}`,
+            strategy: strategy,
+            isAI: true
+        });
+    }
 }
 
 function showCharSelection(charId) {
@@ -991,6 +1104,29 @@ function updateUI() {
         // 重新显示 Boss 身上免疫角标
         updateImmunityIndicator(boss.suit);
     }
+    updateTeammatesUI(); // [NEW] 刷新 AI 队友信息 (v2.5.0)
+
+    const isCurrentAI = gameState.players[gameState.currentPlayerIndex].isAI;
+
+    // [ADD] 手牌自动折叠逻辑 (v2.5.2)
+    const playerStation = document.querySelector('.player-station');
+    if (playerStation) {
+        if (isCurrentAI) {
+            playerStation.classList.add('collapsed');
+            if (elements.manualExpandHandBtn) elements.manualExpandHandBtn.style.display = 'flex';
+        } else {
+            playerStation.classList.remove('collapsed');
+            if (elements.manualExpandHandBtn) elements.manualExpandHandBtn.style.display = 'none';
+        }
+    }
+
+    // 禁用/启用按钮 (AI 回合不准操作)
+    elements.playCardBtn.disabled = isCurrentAI;
+    elements.skipTurnBtn.disabled = isCurrentAI;
+    if (elements.jokerBtn) {
+        elements.jokerBtn.disabled = isCurrentAI || gameState.character.chargesLeft <= 0 || gameState.phase !== 'TURN_START';
+    }
+
     elements.bossDeckCount.textContent = gameState.bossDeck.length;
     elements.playerDeckCount.textContent = gameState.playerDeck.length;
     elements.discardCount.textContent = gameState.discardPile.length;
@@ -1118,6 +1254,44 @@ function updatePlayerHand() {
     player.hand.forEach(card => elements.playerHand.appendChild(createCardElement(card)));
 }
 
+// [NEW] 渲染 AI 队友状态栏 (v2.5.0)
+function updateTeammatesUI() {
+    if (!elements.teammatesZone) return;
+    elements.teammatesZone.innerHTML = '';
+
+    const aiPlayers = gameState.players.filter(p => p.isAI);
+    if (aiPlayers.length === 0) {
+        elements.teammatesZone.style.display = 'none';
+        return;
+    }
+    elements.teammatesZone.style.display = 'flex';
+
+    // 翻译策略名
+    const StrategyNames = {
+        'balanced': '平衡',
+        'defensive': '稳健',
+        'aggressive': '激进'
+    };
+
+    aiPlayers.forEach(ai => {
+        const isActive = gameState.players[gameState.currentPlayerIndex].id === ai.id;
+        const box = document.createElement('div');
+        box.className = 'teammate-box' + (isActive ? ' active-turn' : '');
+        
+        box.innerHTML = `
+            <div class="tm-title-line">
+                <div class="tm-name">${ai.name}</div>
+                <div class="tm-strategy">[ ${StrategyNames[ai.strategy] || 'AI'} ]</div>
+            </div>
+            <div class="tm-hand-count">
+                <div class="tm-hand-icon"></div>
+                x ${ai.hand.length}
+            </div>
+        `;
+        elements.teammatesZone.appendChild(box);
+    });
+}
+
 function updateFieldCards() {
     elements.fieldCards.innerHTML = '';
     gameState.fieldCards.forEach(card => {
@@ -1129,11 +1303,14 @@ function updateFieldCards() {
 }
 
 function selectCardForCombo(cardId) {
+    // [ADD] AI 回合禁止玩家选牌 (v2.5.0)
+    if (gameState.players[gameState.currentPlayerIndex].isAI) return;
+
     if (gameState.phase === 'TAKE_DAMAGE') {
         selectCardForDefense(cardId);
         return;
     }
-    const player = gameState.players[0];
+    const player = gameState.players[gameState.currentPlayerIndex];
     const card = player.hand.find(c => c.id === cardId);
     if (!card) return;
     const index = selectedCardsForCombo.findIndex(c => c.id === cardId);
@@ -1228,7 +1405,7 @@ function showDamageEffect(damage, skillMessage = '') {
 
 function showDefensePanel() {
     const requiredValue = gameState.currentBoss.currentATK;
-    const player = gameState.players[0];
+    const player = gameState.players[gameState.currentPlayerIndex];
     const maxPossibleDefense = player.hand.reduce((sum, card) => sum + card.value, 0);
 
     if (maxPossibleDefense < requiredValue) {
@@ -1252,7 +1429,7 @@ function showDefensePanel() {
 }
 
 function selectCardForDefense(cardId) {
-    const player = gameState.players[0];
+    const player = gameState.players[gameState.currentPlayerIndex];
     const card = player.hand.find(c => c.id === cardId);
     if (!card) return;
     const index = selectedCardsForDefense.findIndex(c => c.id === cardId);
@@ -1291,7 +1468,7 @@ function executeChosenOneSkill() {
     gameState.currentBoss.isSpecialDisabled = true;
 
     // 2. 弃手牌并重抽
-    const player = gameState.players[0];
+    const player = gameState.players[gameState.currentPlayerIndex];
     gameState.discardPile.push(...player.hand);
     player.hand = [];
 
@@ -1312,7 +1489,7 @@ function executeBardSkill() {
         return;
     }
 
-    const player = gameState.players[0];
+    const player = gameState.players[gameState.currentPlayerIndex];
     const discardCount = selectedCardsForCombo.length;
 
     // [NEW] 记录卡牌明细以便在日志中展示
@@ -1347,7 +1524,7 @@ function executeBardSkill() {
 
 // 辅助函数：带溢出处理的抽牌逻辑
 function drawWithOverflow(totalNeeded) {
-    const player = gameState.players[0];
+    const player = gameState.players[gameState.currentPlayerIndex];
     let drawn = 0;
 
     // 优先从墓地（弃牌堆）抽取
@@ -1433,6 +1610,246 @@ const style = document.createElement('style');
 style.textContent = `@keyframes damageFloat { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -150%) scale(1.5); opacity: 0; } }`;
 document.head.appendChild(style);
 
+// =============================================================================
+// 8. AI ENGINE (v2.5.0)
+// =============================================================================
+
+function triggerAITurn() {
+    const aiPlayer = gameState.players[gameState.currentPlayerIndex];
+    if (!aiPlayer.isAI) return;
+
+    if (gameState.phase === 'TAKE_DAMAGE') {
+        setTimeout(() => handleAIDefense(aiPlayer), window.aiDelay || 1500);
+    } else if (gameState.phase === 'TURN_START') {
+        setTimeout(() => handleAIOffense(aiPlayer), window.aiDelay || 1500);
+    }
+}
+
+function handleAIDefense(aiPlayer) {
+    const requiredValue = gameState.currentBoss.currentATK;
+    const maxPossibleDefense = aiPlayer.hand.reduce((sum, card) => sum + card.value, 0);
+
+    // [失败判定]
+    if (maxPossibleDefense < requiredValue) {
+        const failMsg = `${aiPlayer.name} 的手牌点数不足以抵挡 Boss 的攻击！`;
+        addLogEntry(`${aiPlayer.name} 防守失败 (需要 ${requiredValue})！`, 'error');
+        showGameOver(false, failMsg);
+        return;
+    }
+
+    const { selectedCards, totalValue } = calculateAIDefense(aiPlayer.hand, requiredValue, gameState.currentBoss, aiPlayer.strategy);
+
+    // 执行防守动作
+    const cardNames = selectedCards.map(c => `${c.suit}${c.rank}`).join('+');
+    addLogEntry(`[防守] ${aiPlayer.name} 弃置了 ${cardNames} (抵挡 ${totalValue} 点伤害)`, 'defense');
+
+    selectedCards.forEach(selectedCard => {
+        const index = aiPlayer.hand.findIndex(card => card.id === selectedCard.id);
+        if (index !== -1) {
+            aiPlayer.hand.splice(index, 1);
+            gameState.discardPile.push(selectedCard);
+        }
+    });
+
+    passTurn();
+    showToastMessage(`${aiPlayer.name} 成功防御！`);
+    playSound('playCard'); // 复用声效
+}
+
+function calculateAIDefense(hand, requiredValue, currentBoss, strategy) {
+    const immuneSuit = currentBoss.isSpecialDisabled ? null : currentBoss.currentBoss.suit;
+    
+    // Sort logic to prefer yielding "useless" cards early
+    // Priority:
+    // 1. Immune suit cards
+    // 2. Non-Spade, non-Ace cards, ascending value
+    // 3. Spades / Aces / Combos
+    const sortedHand = [...hand].sort((a, b) => {
+        const aIsImmune = a.suit === immuneSuit ? 1 : 0;
+        const bIsImmune = b.suit === immuneSuit ? 1 : 0;
+        
+        // 优先弃掉 Boss 免疫的花色
+        if (aIsImmune !== bIsImmune) return bIsImmune - aIsImmune; 
+
+        // 尽量保留 A (组合技引擎)
+        const aIsAce = a.rank === 'A' ? 1 : 0;
+        const bIsAce = b.rank === 'A' ? 1 : 0;
+        if (aIsAce !== bIsAce) return aIsAce - bIsAce;
+
+        // 尽量保留黑桃 (如果是强力免疫外)
+        const aIsSpade = (a.suit === '♠' && immuneSuit !== '♠') ? 1 : 0;
+        const bIsSpade = (b.suit === '♠' && immuneSuit !== '♠') ? 1 : 0;
+        if (aIsSpade !== bIsSpade) return aIsSpade - bIsSpade;
+
+        // 如果策略是稳健型，更积极保留红桃
+        if (strategy === 'defensive') {
+            const aIsHeart = (a.suit === '♥' && immuneSuit !== '♥') ? 1 : 0;
+            const bIsHeart = (b.suit === '♥' && immuneSuit !== '♥') ? 1 : 0;
+            if (aIsHeart !== bIsHeart) return aIsHeart - bIsHeart;
+        }
+
+        // 默认按从小到大丢弃
+        return a.value - b.value;
+    });
+
+    let currentSum = 0;
+    const selectedCards = [];
+    
+    // 贪心挑选直至满足防御
+    for (let i = 0; i < sortedHand.length; i++) {
+        if (currentSum >= requiredValue) break;
+        selectedCards.push(sortedHand[i]);
+        currentSum += sortedHand[i].value;
+    }
+
+    // 后期优化点: 如果 currentSum 严重超出 requiredValue, 
+    // 可以尝试用动态规划求更精确的最佳组合 (例如背包问题找大于等于 target 的最小和)以免浪费高价值单卡。
+    // 在这里简单实现贪心。
+    
+    return { selectedCards, totalValue: currentSum };
+}
+
+function handleAIOffense(aiPlayer) {
+    const { selectedCards } = calculateAIOffense(aiPlayer.hand, gameState.currentBoss, aiPlayer.strategy);
+
+    if (!selectedCards || selectedCards.length === 0) {
+        skipTurn();
+    } else {
+        executeCombo(selectedCards);
+        updateUI();
+    }
+}
+
+function calculateAIOffense(hand, currentBoss, strategy) {
+    const immuneSuit = currentBoss.isSpecialDisabled ? null : currentBoss.currentBoss.suit;
+    const bossHP = currentBoss.currentHP;
+    const bossATK = currentBoss.currentATK;
+
+    // 1. 斩杀/感化判定 (Purify: Damage == BossHP)
+    // 优先级最高，不仅获得卡牌还能清除威胁
+    const purifyCombo = findSpecificDamageCombo(hand, bossHP, immuneSuit);
+    if (purifyCombo) return { selectedCards: purifyCombo };
+
+    // 2. 资源/生存优先级 (根据策略和现状调整)
+    // 平衡型基准
+    
+    // 如果手牌极少 (<=3)，强行找方片
+    if (hand.length <= 3) {
+        const drawCombo = findBestComboBySuit(hand, '♦', immuneSuit);
+        if (drawCombo) return { selectedCards: drawCombo };
+    }
+
+    // 如果 Boss 伤害很高 (>=10) 且不免疫黑桃，优先黑桃
+    if (bossATK >= 10 && immuneSuit !== '♠') {
+        const shieldCombo = findBestComboBySuit(hand, '♠', immuneSuit);
+        if (shieldCombo) return { selectedCards: shieldCombo };
+    }
+
+    // 如果手牌还是比较少 (<=5)，依然倾向找方片
+    if (hand.length <= 5) {
+        const drawCombo = findBestComboBySuit(hand, '♦', immuneSuit);
+        if (drawCombo) return { selectedCards: drawCombo };
+    }
+
+    // 3. 进攻优先级 (Clubs > Hearts > Spades)
+    // 激进型优先草花，稳健型优先红桃/黑桃
+    let preferredSuits = ['♣', '♥', '♠', '♦'];
+    if (strategy === 'defensive') preferredSuits = ['♠', '♥', '♦', '♣'];
+    if (strategy === 'aggressive') preferredSuits = ['♣', '♦', '♠', '♥'];
+
+    for (const suit of preferredSuits) {
+        const combo = findBestComboBySuit(hand, suit, immuneSuit);
+        if (combo) return { selectedCards: combo };
+    }
+
+    // 4. 兜底策略: 随便出一张
+    const fallback = findBestSingleFallback(hand, immuneSuit);
+    return { selectedCards: fallback };
+}
+
+// 辅助：寻找特定伤害的 Combo
+function findSpecificDamageCombo(hand, targetDamage, immuneSuit) {
+    const allLegalCombos = getAllLegalCombos(hand);
+    
+    // 过滤出能打出正好 targetDamage 的组合
+    const possible = allLegalCombos.filter(combo => {
+        let dmg = combo.reduce((s, c) => s + c.value, 0);
+        // 如果是草花且 Boss 不免疫，伤害翻倍
+        const hasClub = combo.some(c => c.suit === '♣');
+        if (hasClub && immuneSuit !== '♣') dmg *= 2;
+        return dmg === targetDamage;
+    });
+
+    return possible.length > 0 ? possible[0] : null;
+}
+
+// 辅助：根据花色偏好寻找最有价值 Combo
+function findBestComboBySuit(hand, preferredSuit, immuneSuit) {
+    if (preferredSuit === immuneSuit) return null;
+
+    const allLegalCombos = getAllLegalCombos(hand);
+    const suitCombos = allLegalCombos.filter(combo => combo.some(c => c.suit === preferredSuit));
+
+    if (suitCombos.length === 0) return null;
+
+    // 排序逻辑：能打出的花色效果（伤害、补牌、降攻等）最高优先
+    suitCombos.sort((a, b) => {
+        const valA = a.reduce((s, c) => s + c.value, 0);
+        const valB = b.reduce((s, c) => s + c.value, 0);
+        return valB - valA; // 降序
+    });
+
+    return suitCombos[0];
+}
+
+// 辅助：列出所有合法的单卡及简单 Combo (Pets, Multiples)
+function getAllLegalCombos(hand) {
+    const combos = [];
+    
+    // 1. 单卡
+    hand.forEach(c => combos.push([c]));
+
+    // 2. 宠物 (Ace + Card)
+    const aces = hand.filter(c => c.rank === 'A');
+    const others = hand.filter(c => c.rank !== 'A');
+    aces.forEach(a => {
+        others.forEach(o => combos.push([a, o]));
+    });
+
+    // 3. 同点数组合 (Sum <= 10)
+    const byRank = {};
+    hand.forEach(c => {
+        if (c.rank === 'A') return; // A 不进点数组合
+        if (!byRank[c.rank]) byRank[c.rank] = [];
+        byRank[c.rank].push(c);
+    });
+
+    for (const rank in byRank) {
+        const cards = byRank[rank];
+        const val = cards[0].value;
+        if (cards.length >= 2 && val * 2 <= 10) combos.push([cards[0], cards[1]]);
+        if (cards.length >= 3 && val * 3 <= 10) combos.push([cards[0], cards[1], cards[2]]);
+        if (cards.length >= 4 && val * 4 <= 10) combos.push([cards[0], cards[1], cards[2], cards[3]]);
+    }
+
+    return combos;
+}
+
+function findBestSingleFallback(hand, immuneSuit) {
+    const nonImmune = hand.filter(c => c.suit !== immuneSuit);
+    if (nonImmune.length > 0) {
+        return [nonImmune.sort((a, b) => b.value - a.value)[0]];
+    }
+    // 实在没办法，出张最小的免疫废牌去“抵消”Boss技能（其实就是浪费掉）
+    if (hand.length > 0) {
+        return [hand.sort((a, b) => a.value - b.value)[0]];
+    }
+    return null;
+}
+
+// 供跳过和执行事件访问的全局延迟参数
+window.aiDelay = 1500;
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log(`[AudioDebug] Initializing game v${CONFIG.VERSION}`);
     if (typeof MIDIjs !== 'undefined') {
@@ -1443,4 +1860,14 @@ document.addEventListener('DOMContentLoaded', () => {
     showStartScreen();
     document.addEventListener('keydown', handleStartKeydown);
     document.addEventListener('click', handleStartClick);
+
+    // [NEW] 绑定手动展开手牌按钮逻辑 (v2.5.2)
+    if (elements.manualExpandHandBtn) {
+        elements.manualExpandHandBtn.onclick = () => {
+            const playerStation = document.querySelector('.player-station');
+            if (playerStation) {
+                playerStation.classList.toggle('collapsed');
+            }
+        };
+    }
 });

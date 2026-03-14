@@ -1506,4 +1506,265 @@ body {
     color: var(--gold);
     font-weight: 900;
     margin-top: 2px;
+}/* --- AI 队伍配置界面 (v2.5.0) --- */
+.ai-selection {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.ai-config-list {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    text-align: left;
+}
+
+.ai-config-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ai-config-row .cfg-label {
+    color: var(--gold);
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.styled-select {
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    border: 1px solid var(--gold);
+    padding: 8px 15px;
+    border-radius: 4px;
+    font-size: 1em;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+}
+
+.styled-select:focus {
+    box-shadow: 0 0 10px var(--gold-glow);
+}
+/* --- AI 队友区域 (v2.5.0) --- */
+.teammates-zone {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 20px;
+    min-height: 80px;
+}
+
+.teammate-box {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 10px 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 120px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    position: relative;
+}
+
+.teammate-box.active-turn {
+    border-color: var(--gold);
+    box-shadow: 0 0 15px rgba(252, 207, 49, 0.6);
+}
+
+.tm-name {
+    color: var(--gold);
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.tm-strategy {
+    font-size: 10px;
+    color: #ccc;
+    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.tm-hand-count {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 900;
+}
+
+.tm-hand-icon {
+    width: 24px;
+    height: 34px;
+    background: #444;
+    border: 1px solid #777;
+    border-radius: 3px;
+    display: inline-block;
+}
+/* --- UI Polish & Fixes (v2.5.2) --- */
+
+/* 1. 队伍配置页返回按钮 */
+.menu-back-btn {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ccc;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+    z-index: 10;
+}
+
+.menu-back-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--gold);
+    border-color: var(--gold);
+}
+
+.small-btn {
+    width: auto !important;
+    min-width: 160px;
+    padding: 12px 30px;
+}
+
+/* 2. 手牌区整体缩小 (用户要求等比例缩小) */
+.player-station {
+    transform: scale(0.9);
+    transform-origin: bottom center;
+}
+
+.hand-container {
+    padding: 10px !important;
+}
+
+.card {
+    scale: 0.9; /* 进一步缩小单张卡牌感官 */
+}
+
+/* 3. AI 队友显示紧凑化 (策略同行) */
+.teammate-box {
+    padding: 8px 12px !important;
+    min-width: 140px !important;
+    gap: 5px;
+}
+
+.tm-title-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+}
+
+.tm-name { 
+    margin-bottom: 0 !important;
+}
+
+.tm-strategy {
+    margin-bottom: 0 !important;
+    font-size: 11px !important;
+    opacity: 0.8;
+}
+
+/* 4. 手牌收起动画逻辑 */
+.player-station {
+    transition: transform 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.5s;
+}
+
+.player-station.collapsed {
+    transform: translateY(120%) scale(0.8);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* 展开按钮 (AI 回合手动查看时使用) */
+#manualExpandHandBtn {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    background: var(--gold);
+    color: #000;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 0 15px var(--gold-glow);
+    z-index: 2000;
+    border: none;
+    font-size: 20px;
+}
+/* --- AI Polish Fixes (v2.5.2) --- */
+/* 修正 AI 队友盒子变量名并确保紧凑样式生效 */
+.teammates-zone {
+    margin-bottom: 10px !important;
+}
+
+.teammate-box {
+    flex-direction: column !important;
+}
+
+.tm-title-line {
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+/* --- Plate Fix & AI Turn Optimization (v2.5.3) --- */
+
+/* 消除所有底部区域可能的背景色，确保它是透明悬浮感 */
+.player-station {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.player-station-inner {
+    background: transparent !important;
+}
+
+/* AI 回合彻底隐藏黑色残留和手牌区 */
+.player-station.collapsed {
+    transform: translateY(150%) scale(0.7); /* 移得更远 */
+    opacity: 0 !important; /* 完全透明 */
+    pointer-events: none;
+    visibility: hidden; /* 防止物理占位可能导致的边框/阴影残留 */
+}
+
+/* 确保动画流畅 */
+.player-station {
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), 
+                opacity 0.4s ease, 
+                visibility 0.4s !important;
+}
+
+/* 缩小倍率优化：移除 transform 原点偏移可能导致的缝隙 */
+.player-station:not(.collapsed) {
+    transform: scale(0.85); /* 稍微再缩小一点点，确保在大视野下更和谐 */
+    transform-origin: bottom center;
 }

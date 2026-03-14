@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title></title>
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>弑君者 (Regicide) - v2.5.3</title>
     <link
         href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Cardo:wght@400;700&family=Inter:wght@300;400;700;900&display=swap"
         rel="stylesheet">
@@ -17,7 +17,7 @@
     <div class="start-screen" id="startScreen">
         <div class="start-screen-inner">
             <!-- 修复路径：使用本地生成的 startup_bg.png -->
-            <img src="startup_bg.png" class="start-screen-image-bg" id="startScreenImage">
+            <img src="startup_bg.png" class="start-screen-image-bg" id="startScreenImage" alt="Regicide Startup Background">
             <div class="start-content-overlay">
                 <div class="start-screen-title serif">--</div>
                 <div class="start-screen-subtitle">--</div>
@@ -105,6 +105,40 @@
         </div>
     </div>
 
+    <!-- 队伍配置界面 (v2.5.2 抛光) -->
+    <div class="ai-selection" id="aiSelection" style="display: none;">
+        <div class="menu-bg-overlay"></div>
+        <div class="menu-content glass-wrap" style="max-width: 500px; position: relative; padding-top: 60px;">
+            <!-- 返回按钮移至左上角 -->
+            <button class="menu-back-btn" id="cancelAiBtn">
+                <span class="btn-icon">↩</span>
+                <span class="btn-text">返回</span>
+            </button>
+
+            <h2 class="menu-title serif">队伍配置 / SQUAD</h2>
+            <div class="menu-divider"></div>
+            
+            <div class="ai-config-list">
+                <div class="ai-config-row">
+                    <span class="cfg-label">AI 队友数量:</span>
+                    <select id="aiCountSelect" class="styled-select">
+                        <option value="0">0 (纯单机冒险)</option>
+                        <option value="1">1名队友</option>
+                        <option value="2">2名队友</option>
+                        <option value="3">3名队友</option>
+                    </select>
+                </div>
+                <div id="aiStrategyContainer"></div>
+            </div>
+
+            <div class="menu-buttons" style="margin-top:30px; display: flex; justify-content: center;">
+                <button class="menu-btn primary small-btn" id="confirmAiBtn">
+                    <span class="btn-text">确认队伍</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="game-container">
         <!-- 顶部信息 -->
         <header class="top-info">
@@ -125,6 +159,9 @@
 
             <!-- 中间战场区域 -->
             <main class="tabletop game-board">
+                <!-- AI 队友区域 (v2.5.0) -->
+                <div class="teammates-zone" id="teammatesZone"></div>
+
                 <div class="center-stage">
                     <div class="deck-area">
                         <div class="deck-pile player-deck">
