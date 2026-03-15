@@ -121,7 +121,7 @@
             <div class="ai-config-list">
                 <div class="ai-config-row">
                     <span class="cfg-label">AI 队友数量:</span>
-                    <select id="aiCountSelect" class="styled-select">
+                    <select id="aiCountSelect" class="styled-select" aria-label="AI 队友数量">
                         <option value="0">0 (纯单机冒险)</option>
                         <option value="1">1名队友</option>
                         <option value="2">2名队友</option>
@@ -195,10 +195,11 @@
                             <div class="counter-label">--</div>
                                 <div class="counter-value" id="bossAttack">--</div>
                             </div>
-                            <div class="stat-counter shield">
-                            <div class="counter-label">--</div>
+                            <!-- 护盾显示位已按用户要求移除 (v2.7.1) -->
+                            <!-- <div class="stat-counter shield">
+                                <div class="counter-label">--</div>
                                 <div class="counter-value" id="bossShield">0</div>
-                            </div>
+                            </div> -->
                         </div>
                     </div>
 

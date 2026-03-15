@@ -16,7 +16,7 @@
 // 1. CONFIG & CONSTANTS
 // =============================================================================
 const CONFIG = {
-    VERSION: '2.5.6',
+    VERSION: '2.7.1',
     CARD_VALUES: {
         'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
         'J': 10, 'Q': 15, 'K': 20, 'JOKER': 0
@@ -222,7 +222,7 @@ const elements = {
     bossSuit: document.getElementById('bossSuit'),
     bossRank: document.getElementById('bossRank'),
     bossImmunity: document.getElementById('bossImmunity'), // 新增免疫角标
-    bossShield: document.getElementById('bossShield'), // [NEW] (v2.5.4)
+    // bossShield: document.getElementById('bossShield'), // 组件已移除 (v2.7.1)
     bossDeckCount: document.getElementById('bossDeckCount'),
     playerDeckCount: document.getElementById('playerDeckCount'),
     discardCount: document.getElementById('discardCount'),
@@ -1340,7 +1340,7 @@ function updateShieldEffect() {
     const shieldValue = getTotalShieldValue();
     gameState.currentBoss.currentATK = Math.max(0, gameState.currentBoss.baseATK - shieldValue);
     elements.bossAttack.textContent = gameState.currentBoss.currentATK;
-    if (elements.bossShield) elements.bossShield.textContent = shieldValue;
+    // if (elements.bossShield) elements.bossShield.textContent = shieldValue;
 }
 
 function updateImmunityIndicator(bossSuit) {
