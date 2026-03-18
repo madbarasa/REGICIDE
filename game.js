@@ -16,7 +16,7 @@
 // 1. CONFIG & CONSTANTS
 // =============================================================================
 const CONFIG = {
-    VERSION: '2.7.1',
+    VERSION: '2.9.3',
     CARD_VALUES: {
         'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
         'J': 10, 'Q': 15, 'K': 20, 'JOKER': 0
@@ -486,11 +486,17 @@ function initGame() {
 
     // 将选定的 AI 加入队伍
     selectedAIs.forEach((aiConfig, index) => {
+        const charData = CONFIG.CHARACTERS[aiConfig.charId] || CONFIG.CHARACTERS['CHOSEN_ONE'];
+        const level = 1;
         players.push({
             id: aiConfig.id,
-            name: aiConfig.name,
+            name: `${aiConfig.name} (${charData.name})`,
             isAI: true,
             strategy: aiConfig.strategy,
+            charId: aiConfig.charId || 'CHOSEN_ONE',
+            chargesLeft: charData.skills.charges(level),
+            maxCharges: charData.skills.charges(level),
+            skillResetType: charData.skills.resetType(level),
             hand: [],
             maxHandSize: maxHandSize
         });
@@ -510,6 +516,8 @@ function initGame() {
         playerDeck: playerDeck,
         discardPile: [],
         fieldCards: [],
+        isYielding: false, 
+        currentTurnActionCount: 0, // [NEW] 追踪本回合行动次数 (v2.9.0)
         currentBoss: {
             currentBoss: currentBossCard,
             currentHP: bossConfig.hp,
@@ -609,7 +617,6 @@ function createPlayerDeck() {
 function drawCards(player, count) {
     for (let i = 0; i < count; i++) {
         if (gameState.playerDeck.length === 0) {
-            // [FIX] 不再触发失败，符合弑君者原生规则：卡牌不够抽只抽到空即可。
             break;
         }
         if (player.hand.length >= player.maxHandSize) break;
@@ -643,7 +650,8 @@ function executeCombo(cards) {
     let comboSkills = new Set();
 
     const cardNames = cards.map(card => `${card.suit}${card.rank}`).join('+');
-    addLogEntry(`${player.name} 出牌: ${cardNames}`, 'skill');
+    addLogEntry(`玩家 ${player.name} 出牌: ${cardNames}`, 'skill');
+    gameState.currentTurnActionCount++; // 行动计数自增
     playSound('playCard');
 
     cards.forEach(card => {
@@ -673,9 +681,7 @@ function executeCombo(cards) {
     let finalDamage = comboDamage;
     const skillEffects = [];
 
-    // [FIX] 分离免疫处理：确保每种花色独立结算，且红牌技能使用总伤害(comboDamage)
     comboSkills.forEach(suit => {
-        // [MOD] Joker 强化：如果 Boss 技能被中和，忽略花色免疫
         if (gameState.currentBoss.currentBoss.suit === suit && !gameState.currentBoss.isSpecialDisabled) {
             addLogEntry(`${suit}技能被免疫`, 'error');
             return;
@@ -697,33 +703,47 @@ function executeCombo(cards) {
                 addLogEntry(CONFIG.UI_TEXT.LOGS.SKILL_SPADE.replace('{val}', spadesPower), 'skill');
                 break;
             case '♦':
-                // 方片按照总伤害值(comboDamage)进行抽牌
+                // [MOD] 方片序列化补给逻辑 (v2.8.0)
                 const drawCount = comboDamage;
-                let actualDraws = 0, overflowCount = 0;
-                for (let i = 0; i < drawCount && gameState.playerDeck.length > 0; i++) {
-                    const drawnCard = gameState.playerDeck.pop();
-                    if (player.hand.length >= player.maxHandSize) {
-                        // [MOD] Lv.2 回流逻辑
-                        if (gameState.character && gameState.character.overflowToDeck) {
-                            gameState.playerDeck.unshift(drawnCard); // 回流到酒馆底
-                        } else {
-                            gameState.discardPile.push(drawnCard);
+                let actualDrawsTotal = 0;
+                let overflowCountTotal = 0;
+                let cardsRemaining = drawCount;
+                const playersCount = gameState.players.length;
+                let playerOffset = 0;
+
+                while (cardsRemaining > 0 && gameState.playerDeck.length > 0) {
+                    const allFull = gameState.players.every(p => p.hand.length >= p.maxHandSize);
+                    if (allFull) {
+                        while (cardsRemaining > 0 && gameState.playerDeck.length > 0) {
+                            const overflowCard = gameState.playerDeck.pop();
+                            if (gameState.character && gameState.character.overflowToDeck) {
+                                gameState.playerDeck.unshift(overflowCard);
+                            } else {
+                                gameState.discardPile.push(overflowCard);
+                            }
+                            overflowCountTotal++;
+                            cardsRemaining--;
                         }
-                        overflowCount++;
-                    } else {
-                        player.hand.push(drawnCard);
-                        actualDraws++;
+                        break;
                     }
+
+                    const targetIdx = (gameState.currentPlayerIndex + playerOffset) % playersCount;
+                    const targetPlayer = gameState.players[targetIdx];
+                    if (targetPlayer.hand.length < targetPlayer.maxHandSize) {
+                        const drawnCard = gameState.playerDeck.pop();
+                        targetPlayer.hand.push(drawnCard);
+                        actualDrawsTotal++;
+                        cardsRemaining--;
+                    }
+                    playerOffset++;
                 }
-                if (overflowCount > 0 && gameState.character && gameState.character.overflowToDeck) {
-                    addLogEntry(CONFIG.UI_TEXT.LOGS.OVERFLOW_DECK.replace('{count}', overflowCount), 'defense');
-                }
-                skillEffects.push(`补给+${actualDraws}`);
-                if (actualDraws > 0 || overflowCount > 0) playSound('draw');
-                addLogEntry(CONFIG.UI_TEXT.LOGS.SKILL_DIAMOND.replace('{req}', drawCount).replace('{act}', actualDraws), 'skill');
+                skillEffects.push(`补给+${actualDrawsTotal}`);
+                if (actualDrawsTotal > 0 || overflowCountTotal > 0) playSound('draw');
+                let logMsg = `♦ 补给：全队依次获得 ${actualDrawsTotal} 张卡牌`;
+                if (overflowCountTotal > 0) logMsg += `，${overflowCountTotal} 张因手牌满溢出`;
+                addLogEntry(logMsg, 'skill');
                 break;
             case '♥':
-                // 红心按照总伤害值(comboDamage)进行回收
                 const recycleCount = Math.min(comboDamage, gameState.discardPile.length);
                 if (recycleCount > 0) {
                     const recycledCards = gameState.discardPile.splice(-recycleCount);
@@ -778,8 +798,16 @@ function executeCombo(cards) {
                 playSound('bossVictory');
                 addLogEntry(CONFIG.UI_TEXT.LOGS.BOSS_DEFEATED, 'error');
             }
-            passTurn();
-            showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.NEW_BOSS_TOAST);
+            
+            updateUI();
+            const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+            if (currentPlayer.isAI) {
+                if (typeof triggerAITurn === 'function') {
+                    setTimeout(() => triggerAITurn(), window.aiDelay || 1500);
+                }
+            } else {
+                showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.NEW_BOSS_TOAST);
+            }
         }, 1500);
     } else {
         // [MOD] 延时 1.5s 进入防御阶段，避免与伤害飘字叠加
@@ -811,7 +839,15 @@ function nextBoss() {
     // [NEW] 角色技能重置钩子 (v2.4.0)
     if (gameState.character && gameState.character.skillResetType === 'BOSS') {
         gameState.character.chargesLeft = gameState.character.maxCharges;
-        addLogEntry(`✨ 战斗重燃！技能次数已恢复`, 'skill');
+        addLogEntry(`✨ 战斗重燃！玩家技能次数已恢复`, 'skill');
+    }
+    // AI队友技能重置
+    if (gameState.players) {
+        gameState.players.filter(p => p.isAI).forEach(ai => {
+            if (ai.skillResetType === 'BOSS') {
+                ai.chargesLeft = ai.maxCharges;
+            }
+        });
     }
 
     // [NEW] 动态设置 Boss 左上角水印 (v2.4.4)
@@ -851,7 +887,18 @@ function confirmDefense() {
 
     elements.defensePanel.style.display = 'none';
     elements.actionButtons.style.display = 'flex';
-    passTurn();
+    
+    // [MOD] 回合流转逻辑 (v2.8.0)
+    // 只有在主动“放弃出牌”导致的防御结算后，才流转到下一个玩家
+    if (gameState.isYielding) {
+        gameState.isYielding = false;
+        passTurn();
+    } else {
+        // 攻击后的正常反击防御，防御成功后依然是当前玩家的回合
+        gameState.phase = 'TURN_START';
+        updateUI();
+    }
+
     showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.DEFENSE_SUCCESS);
     addLogEntry(CONFIG.UI_TEXT.LOGS.DEFENSE_SUCCESS, 'skill');
     selectedCardsForDefense = [];
@@ -859,9 +906,21 @@ function confirmDefense() {
 
 function skipTurn() {
     selectedCardsForCombo = [];
+    gameState.currentTurnActionCount++; // 行为计数自增
     const player = gameState.players[gameState.currentPlayerIndex];
-    addLogEntry(`${player.name} 跳过出牌`, 'defense');
-    handleBossCounterAttack();
+    
+    // [MOD] 防御豁免逻辑 (v2.9.0)
+    // 首回合行动（不论是出牌还是放弃）必须承受 Boss 反击
+    // 如果是该回合内的后续行动（即已经完成过一次攻防），则豁免反击
+    if (gameState.currentTurnActionCount === 1) {
+        gameState.isYielding = true;
+        addLogEntry(`玩家 ${player.name} 执行“放弃出牌”，必须承受当前 Boss 攻击`, 'defense');
+        handleBossCounterAttack();
+    } else {
+        addLogEntry(`玩家 ${player.name} 在完成攻防后选择结束行动，触发【防御豁免】`, 'skill');
+        gameState.isYielding = false; // 豁免模式下不需要标记 yielding，因为不进入防御面板
+        passTurn();
+    }
 }
 
 function handleBossCounterAttack() {
@@ -880,6 +939,7 @@ function handleBossCounterAttack() {
 function passTurn() {
     gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
     gameState.phase = 'TURN_START';
+    gameState.currentTurnActionCount = 0; // 重置行为计数
     updateUI();
     
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
@@ -947,11 +1007,14 @@ function updateAiStrategySelectors() {
         const row = document.createElement('div');
         row.className = 'ai-config-row';
         row.innerHTML = `
-            <span class="cfg-label">AI-${i} 策略:</span>
-            <select class="styled-select" id="aiStrategy_${i}">
-                <option value="balanced">平衡型 (Balanced)</option>
-                <option value="defensive">稳健型 (Defensive)</option>
-                <option value="aggressive">激进型 (Aggressive)</option>
+            <span class="cfg-label" style="font-size:12px; margin-right:5px;">AI-${i}:</span>
+            <select class="styled-select" id="aiCharacter_${i}" style="width:105px; padding:4px;">
+                ${CHAR_IDS.map(id => `<option value="${id}">${CONFIG.CHARACTERS[id].name}</option>`).join('')}
+            </select>
+            <select class="styled-select" id="aiStrategy_${i}" style="width:85px; padding:4px; margin-left:5px;">
+                <option value="balanced">平衡</option>
+                <option value="defensive">稳健</option>
+                <option value="aggressive">激进</option>
             </select>
         `;
         elements.aiStrategyContainer.appendChild(row);
@@ -963,10 +1026,12 @@ function saveAiConfiguration() {
     selectedAIs = [];
     for (let i = 1; i <= count; i++) {
         const strategy = document.getElementById(`aiStrategy_${i}`).value;
+        const charId = document.getElementById(`aiCharacter_${i}`).value;
         selectedAIs.push({
             id: `AI_${i}`,
             name: `AI-${i}`,
             strategy: strategy,
+            charId: charId,
             isAI: true
         });
     }
@@ -1244,6 +1309,11 @@ function applyStaticUI() {
     if (elements.skipTurnBtn) elements.skipTurnBtn.textContent = t.BUTTONS.SKIP;
     if (elements.confirmDefenseBtn) elements.confirmDefenseBtn.textContent = t.BUTTONS.CONFIRM_DEFENSE;
     if (elements.restartGameBtn) elements.restartGameBtn.textContent = t.BUTTONS.RESTART;
+    
+    const confirmCharBtnText = document.querySelector('#confirmCharBtn .btn-text');
+    if (confirmCharBtnText) confirmCharBtnText.textContent = t.BUTTONS.CONFIRM_CHAR;
+    else if (elements.confirmCharBtn) elements.confirmCharBtn.textContent = t.BUTTONS.CONFIRM_CHAR;
+
 
     // Defense inline panel labels
     const defenseLabels = document.querySelectorAll('#defensePanel .defense-info-mini .v-label');
@@ -1530,6 +1600,61 @@ function executeBardSkill() {
     updateUI();
 }
 
+function executeChosenOneSkillForPlayer(player) {
+    gameState.currentBoss.isSpecialDisabled = true;
+    gameState.discardPile.push(...player.hand);
+    player.hand = [];
+
+    // 从墓地和酒馆各抽，上限受玩家最大手牌数限制
+    let drawn = 0;
+    while (drawn < player.maxHandSize && gameState.discardPile.length > 0) {
+        player.hand.push(gameState.discardPile.pop());
+        drawn++;
+    }
+    while (drawn < player.maxHandSize && gameState.playerDeck.length > 0) {
+        player.hand.push(gameState.playerDeck.pop());
+        drawn++;
+    }
+
+    player.chargesLeft--;
+
+    addLogEntry(`🃏 [${player.name}] 使用 Joker！Boss技能失效并重置手牌`, 'skill');
+    showToastMessage(`🃏 [${player.name}] 发动了 Joker！`);
+    playSound('purify');
+    updateUI();
+}
+
+function executeBardSkillForAI(player) {
+    const immuneSuit = gameState.currentBoss.isSpecialDisabled ? null : gameState.currentBoss.currentBoss.suit;
+    const sorted = [...player.hand].sort((a,b) => a.value - b.value);
+    const toDiscard = [];
+    sorted.forEach(c => {
+        if (c.rank !== 'A' && c.suit !== '♠') {
+            if (toDiscard.length < Math.floor(player.maxHandSize / 2)) toDiscard.push(c);
+        }
+    });
+
+    if (toDiscard.length === 0) return false;
+
+    const discardCount = toDiscard.length;
+    toDiscard.forEach(card => {
+        const idx = player.hand.findIndex(c => c.id === card.id);
+        if (idx !== -1) player.hand.splice(idx, 1);
+        gameState.discardPile.push(card);
+    });
+
+    const oldIds = player.hand.map(c => c.id);
+    drawCards(player, discardCount);
+    const newCards = player.hand.filter(c => !oldIds.includes(c.id));
+
+    player.chargesLeft--;
+    addLogEntry(`🎶 [${player.name}] 发动【万能之手】洗了 ${discardCount} 张牌`, 'skill');
+    showToastMessage(`🎶 [${player.name}] 使用了万能之手！`);
+    playSound('draw');
+    updateUI();
+    return true;
+}
+
 // 辅助函数：带溢出处理的抽牌逻辑
 function drawWithOverflow(totalNeeded) {
     const player = gameState.players[gameState.currentPlayerIndex];
@@ -1666,58 +1791,83 @@ function handleAIDefense(aiPlayer) {
 
 function calculateAIDefense(hand, requiredValue, currentBoss, strategy) {
     const immuneSuit = currentBoss.isSpecialDisabled ? null : currentBoss.currentBoss.suit;
-    
-    // Sort logic to prefer yielding "useless" cards early
-    // Priority:
-    // 1. Immune suit cards
-    // 2. Non-Spade, non-Ace cards, ascending value
-    // 3. Spades / Aces / Combos
-    const sortedHand = [...hand].sort((a, b) => {
-        const aIsImmune = a.suit === immuneSuit ? 1 : 0;
-        const bIsImmune = b.suit === immuneSuit ? 1 : 0;
-        
-        // 优先弃掉 Boss 免疫的花色
-        if (aIsImmune !== bIsImmune) return bIsImmune - aIsImmune; 
 
-        // 尽量保留 A (组合技引擎)
-        const aIsAce = a.rank === 'A' ? 1 : 0;
-        const bIsAce = b.rank === 'A' ? 1 : 0;
-        if (aIsAce !== bIsAce) return aIsAce - bIsAce;
-
-        // 尽量保留黑桃 (如果是强力免疫外)
-        const aIsSpade = (a.suit === '♠' && immuneSuit !== '♠') ? 1 : 0;
-        const bIsSpade = (b.suit === '♠' && immuneSuit !== '♠') ? 1 : 0;
-        if (aIsSpade !== bIsSpade) return aIsSpade - bIsSpade;
-
-        // 如果策略是稳健型，更积极保留红桃
-        if (strategy === 'defensive') {
-            const aIsHeart = (a.suit === '♥' && immuneSuit !== '♥') ? 1 : 0;
-            const bIsHeart = (b.suit === '♥' && immuneSuit !== '♥') ? 1 : 0;
-            if (aIsHeart !== bIsHeart) return aIsHeart - bIsHeart;
-        }
-
-        // 默认按从小到大丢弃
-        return a.value - b.value;
-    });
-
-    let currentSum = 0;
-    const selectedCards = [];
-    
-    // 贪心挑选直至满足防御
-    for (let i = 0; i < sortedHand.length; i++) {
-        if (currentSum >= requiredValue) break;
-        selectedCards.push(sortedHand[i]);
-        currentSum += sortedHand[i].value;
+    function getCardCost(card) {
+        let cost = card.value * 10; // 基础成本：每点点数10成本
+        if (card.suit === immuneSuit) cost = card.value; // 免疫牌弃掉最划算
+        if (card.rank === 'A') cost += 500; // 尽量保留A
+        if (card.suit === '♠' && immuneSuit !== '♠') cost += 200; // 尽量保留护盾牌
+        if (strategy === 'defensive' && card.suit === '♥' && immuneSuit !== '♥') cost += 150; // 稳健型倾向保留红桃
+        return cost;
     }
 
-    // 后期优化点: 如果 currentSum 严重超出 requiredValue, 
-    // 可以尝试用动态规划求更精确的最佳组合 (例如背包问题找大于等于 target 的最小和)以免浪费高价值单卡。
-    // 在这里简单实现贪心。
+    let bestCombo = null;
+    let bestCost = Infinity;
+    let maxDefensePossible = 0;
     
-    return { selectedCards, totalValue: currentSum };
+    const n = hand.length;
+    const totalCombos = 1 << n;
+    
+    // 遍历所有可能的子集组合（$2^n$，由于手牌最多8张，256次循环极快）
+    for (let mask = 1; mask < totalCombos; mask++) {
+        let currentSum = 0;
+        let comboCost = 0;
+        let currentCombo = [];
+        
+        for (let i = 0; i < n; i++) {
+            if (mask & (1 << i)) {
+                currentCombo.push(hand[i]);
+                currentSum += hand[i].value;
+                comboCost += getCardCost(hand[i]);
+            }
+        }
+        
+        if (currentSum > maxDefensePossible) {
+            maxDefensePossible = currentSum;
+        }
+
+        if (currentSum >= requiredValue) {
+            // 对点数溢出和消耗牌数给予轻微惩罚，偏好恰好抵挡且出牌少的组合
+            let waste = currentSum - requiredValue;
+            let finalCost = comboCost + waste * 5 + currentCombo.length * 5;
+
+            if (finalCost < bestCost) {
+                bestCost = finalCost;
+                bestCombo = { selectedCards: currentCombo, totalValue: currentSum };
+            }
+        }
+    }
+
+    // 如果无论如何都防御不住，回退返回所有手牌尽力防御（游戏计算时会触发防守失败）
+    if (!bestCombo) {
+        return { selectedCards: [...hand], totalValue: maxDefensePossible };
+    }
+
+    return bestCombo;
 }
 
 function handleAIOffense(aiPlayer) {
+    // 智能检测是否使用角色技能
+    if (aiPlayer.chargesLeft > 0) {
+        let skillUsed = false;
+        if (aiPlayer.charId === 'CHOSEN_ONE') {
+            const handValue = aiPlayer.hand.reduce((s,c) => s+c.value, 0);
+            // 只有情况不妙时，或者手里全空时发动 Joker
+            if (aiPlayer.hand.length <= 2 || (!gameState.currentBoss.isSpecialDisabled && handValue <= gameState.currentBoss.currentATK)) {
+                executeChosenOneSkillForPlayer(aiPlayer);
+                skillUsed = true;
+            }
+        } else if (aiPlayer.charId === 'BARD') {
+            skillUsed = executeBardSkillForAI(aiPlayer);
+        }
+
+        if (skillUsed) {
+            // 使用技能后暂停一会重新评估局面（再走一次 AIOffense）
+            setTimeout(() => handleAIOffense(aiPlayer), window.aiDelay || 1500);
+            return;
+        }
+    }
+
     const { selectedCards } = calculateAIOffense(aiPlayer.hand, gameState.currentBoss, aiPlayer.strategy);
 
     if (!selectedCards || selectedCards.length === 0) {

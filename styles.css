@@ -96,7 +96,7 @@ body {
     gap: 8px; /* 进一步压缩间距，确保紧凑 */
     padding-top: 5px;
     min-height: 0; /* 移除保底高度，由父容器 flex 决定 */
-    overflow: hidden; /* 控制战场本身不产生溢出 */
+    overflow: visible; /* 恢复可见，防止卡牌裁切 */
 }
 
 .center-stage {
@@ -271,20 +271,33 @@ body {
 .battle-line {
     width: 90%;
     max-width: 800px;
-    min-height: 80px;
+    min-height: 120px; /* 增加保底高度，防止卡牌上下边缘裁切 */
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 10px 0;
+    padding: 15px 0;
     margin-bottom: auto; /* 弹性居中关键：推向中心并留出底边安全 */
+    position: relative; /* 确保水印锚定 */
 }
 
 .field-cards {
     display: flex;
-    gap: 8px;
+    gap: 2px;
     justify-content: center;
     flex-wrap: wrap;
+    min-height: 60px;
+}
+
+.field-cards .card {
+    transform: scale(0.33);
+    margin: -40px -30px; /* 补偿因缩放产生的布局空白 */
+    cursor: default;
+}
+
+.field-cards .card:hover {
+    transform: scale(0.4) translateY(-10px);
+    z-index: 100 !important;
 }
 
 /* 移除此处的冗余控制，统一在 600 行后定义 */
@@ -1257,7 +1270,7 @@ body {
     /* Adjusted for left alignment */
     transform: translateY(-50%);
     /* Center vertically, left aligned */
-    font-size: 8em;
+    font-size: 1.6em; /* 字体缩小 500% (8em -> 1.6em) */
     /* Large font size */
     color: rgba(255, 255, 255, 0.05);
     /* Very transparent white */
