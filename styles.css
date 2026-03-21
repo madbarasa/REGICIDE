@@ -1233,6 +1233,19 @@ body {
     padding: 0 5px;
 }
 
+.right-hud-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.right-hud-group .field-title {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+    letter-spacing: 2px;
+}
+
 .char-badge {
     background: rgba(252, 207, 49, 0.1);
     border: 1px solid rgba(252, 207, 49, 0.6);

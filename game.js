@@ -16,10 +16,10 @@
 // 1. CONFIG & CONSTANTS
 // =============================================================================
 const CONFIG = {
-    VERSION: '2.9.3',
+    VERSION: '2.9.12',
     CARD_VALUES: {
         'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
-        'J': 10, 'Q': 15, 'K': 20, 'JOKER': 0
+        'J': 10, 'Q': 10, 'K': 10, 'JOKER': 0
     },
     BOSS_CONFIG: {
         'J': { hp: 20, atk: 10 },
@@ -34,7 +34,7 @@ const CONFIG = {
         'CHOSEN_ONE': {
             name: '天选之人',
             id: 'CHOSEN_ONE',
-            portrait: 'assets/char_chosen_one.png',
+            portrait: 'assets/characters/char_chosen_one.png',
             bio: '被众神选中的勇士，拥有操控命运（Joker）的潜力。',
             abilities: {
                 lv1: '【小丑1】: 可随时使用 1 张 Joker。效果：Boss 能力无效化，弃手牌并重回 8 张。',
@@ -52,7 +52,7 @@ const CONFIG = {
         'BARD': {
             name: '吟游诗人',
             id: 'BARD',
-            portrait: 'assets/char_bard.png',
+            portrait: 'assets/characters/char_bard.png',
             bio: '游走于酒馆间的乐者，擅长以乐律重排命运（洗牌）。',
             abilities: {
                 lv1: '【万能之手1】: 进攻阶段可弃掉任意张数选中的手牌，并重抽等量牌。每局限 1 次。',
@@ -64,6 +64,58 @@ const CONFIG = {
                 icon: '🎶',
                 charges: (lv) => lv >= 2 ? 2 : 1,
                 resetType: (lv) => lv >= 3 ? 'BOSS' : 'GAME'
+            }
+        },
+        'ZHAO_YUN': {
+            name: '赵云',
+            id: 'ZHAO_YUN',
+            portrait: 'assets/characters/char_zhaoyun.png',
+            bio: '三国名将，枪出如龙，七进七出！龙胆一身，无所畏惧。',
+            abilities: {
+                lv1: '【龙胆】LV.1: 手牌中的♠可以视作♣打出，♣可以视作♠打出。',
+                lv2: '【龙胆】LV.2: 手牌中的♥可以视作♦打出，♦可以视作♥打出。',
+                lv3: '【龙胆】LV.3: 所有打出卡牌无视 Boss 免疫。'
+            },
+            skills: {
+                id: 'PASSIVE',
+                icon: '🐉',
+                charges: (lv) => 0,
+                resetType: (lv) => 'GAME'
+            }
+        },
+        'ALCHEMIST': {
+            name: '炼金术士',
+            id: 'ALCHEMIST',
+            portrait: 'assets/characters/char_alchemist.png',
+            bio: '资源转换与延迟收益大师，将"垃圾"变黄金。',
+            abilities: {
+                lv1: '【等价交换】: 每回合限1次，可将1张手牌与墓地顶1张牌交换。',
+                lv2: '【贤者之石】: 交换次数提升至2次，且交换后若两张牌花色相同，额外抽1张。',
+                lv3: '【大炼成阵】: 每局1次，将当前手牌和墓地牌全部洗入酒馆，从酒馆抽取至手牌上限。'
+            },
+            skills: {
+                id: 'EXCHANGE',
+                icon: '⚗️',
+                charges: (lv) => lv >= 2 ? 2 : 1,
+                resetType: (lv) => 'TURN',
+                ultCharges: (lv) => lv >= 3 ? 1 : 0
+            }
+        },
+        'MONK': {
+            name: '武僧',
+            id: 'MONK',
+            portrait: 'assets/characters/char_monk.png',
+            bio: '突破限制的连招大师，拳既是道。',
+            abilities: {
+                lv1: '【震慑拳15】: 将连招点数限制从 10 提升至 15。',
+                lv2: '【震慑拳20】: 将连招点数限制从 15 提升至 20。',
+                lv3: '【震慑拳Max】: 将连招点数限制提升至 40 (可二连 K)。'
+            },
+            skills: {
+                id: 'PASSIVE',
+                icon: '👊',
+                charges: (lv) => 0,
+                resetType: (lv) => 'GAME'
             }
         }
     },
@@ -205,7 +257,7 @@ let hasGameStarted = false;
 let bgmAudio = null;
 let currentBgmSrc = null;
 let charSelectionIndex = 0; // [NEW] 追踪当前选择的角色索引 (v2.4.0)
-const CHAR_IDS = ['CHOSEN_ONE', 'BARD']; // [NEW] 可选角色列表 (v2.4.0)
+const CHAR_IDS = ['CHOSEN_ONE', 'BARD', 'ZHAO_YUN', 'ALCHEMIST', 'MONK']; // [NEW] 可选角色列表 (v2.4.0)
 
 // [NEW] AI 队友配置 (v2.5.0)
 // 数据结构示例: [{ id: 'AI_1', name: 'AI-1', strategy: 'balanced', isAI: true }]
@@ -480,6 +532,8 @@ function initGame() {
         id: 'player_1',
         name: charData.name,
         isAI: false,
+        charId: charId,
+        level: gameState.character.level,
         hand: [],
         maxHandSize: maxHandSize
     }];
@@ -494,6 +548,7 @@ function initGame() {
             isAI: true,
             strategy: aiConfig.strategy,
             charId: aiConfig.charId || 'CHOSEN_ONE',
+            level: level,
             chargesLeft: charData.skills.charges(level),
             maxCharges: charData.skills.charges(level),
             skillResetType: charData.skills.resetType(level),
@@ -507,7 +562,8 @@ function initGame() {
         character: {
             ...gameState.character,
             chargesLeft: charData.skills.charges(gameState.character.level),
-            maxCharges: charData.skills.charges(gameState.character.level)
+            maxCharges: charData.skills.charges(gameState.character.level),
+            ultCharges: charData.skills.ultCharges ? charData.skills.ultCharges(gameState.character.level) : 0
         },
         phase: 'TURN_START',
         currentPlayerIndex: 0,
@@ -531,7 +587,7 @@ function initGame() {
     // 为首个 Boss 设置左上角水印
     const suitNameMapEng = { '♣': 'club', '♠': 'spade', '♦': 'diamond', '♥': 'heart' };
     const suitEng = suitNameMapEng[currentBossCard.suit];
-    const firstBossImgSrc = `assets/boss_${suitEng}_${currentBossCard.rank.toLowerCase()}.png`;
+    const firstBossImgSrc = `assets/bosses/boss_${suitEng}_${currentBossCard.rank.toLowerCase()}.png`;
     const centerStage = document.querySelector('.center-stage');
     if (centerStage) {
         centerStage.style.setProperty('--boss-watermark', `url('${firstBossImgSrc}')`);
@@ -638,7 +694,18 @@ function validateCombo(cards) {
         const allSameValue = cards.every(card => card.value === firstValue);
         const totalValue = cards.reduce((sum, card) => sum + card.value, 0);
         const noAces = cards.every(card => card.rank !== 'A');
-        if (allSameValue && totalValue <= 10 && noAces && firstValue >= 2 && firstValue <= 10) return true;
+
+        // [NEW] 武僧：突破连招上限 (v2.9.8)
+        const player = gameState.players[gameState.currentPlayerIndex];
+        let comboLimit = 10;
+        if (player.charId === 'MONK') {
+            const lv = player.level || 1;
+            if (lv >= 3) comboLimit = 40;
+            else if (lv >= 2) comboLimit = 20;
+            else comboLimit = 15;
+        }
+
+        if (allSameValue && totalValue <= comboLimit && noAces && firstValue >= 2) return true;
     }
     return false;
 }
@@ -678,11 +745,29 @@ function executeCombo(cards) {
         addLogEntry(`连招: ${cards.length}张${cards[0].rank}`, 'skill');
     }
 
+    // [NEW] 赵云被动逻辑：花色转换 (v2.9.4)
+    if (player.charId === 'ZHAO_YUN') {
+        const tempSkills = new Set(comboSkills);
+        tempSkills.forEach(suit => {
+            if (player.level >= 1) {
+                if (suit === '♠') comboSkills.add('♣');
+                else if (suit === '♣') comboSkills.add('♠');
+            }
+            if (player.level >= 2) {
+                if (suit === '♥') comboSkills.add('♦');
+                else if (suit === '♦') comboSkills.add('♥');
+            }
+        });
+    }
+
     let finalDamage = comboDamage;
     const skillEffects = [];
 
     comboSkills.forEach(suit => {
-        if (gameState.currentBoss.currentBoss.suit === suit && !gameState.currentBoss.isSpecialDisabled) {
+        // [MOD] 赵云 Lv3 无视免疫 (v2.9.4)
+        const isZhaoYunLv3 = player.charId === 'ZHAO_YUN' && player.level >= 3;
+        
+        if (!isZhaoYunLv3 && gameState.currentBoss.currentBoss.suit === suit && !gameState.currentBoss.isSpecialDisabled) {
             addLogEntry(`${suit}技能被免疫`, 'error');
             return;
         }
@@ -695,7 +780,10 @@ function executeCombo(cards) {
                 addLogEntry('♣ 触发：伤害判定翻倍', 'skill');
                 break;
             case '♠':
-                const spadeCards = cards.filter(c => c.suit === '♠');
+                // [MOD] 赵云龙胆：♣ 视作 ♠ (v2.9.4)
+                const isZhaoYunSpadeSwapped = player.charId === 'ZHAO_YUN' && player.level >= 1;
+                const spadeCards = cards.filter(c => c.suit === '♠' || (isZhaoYunSpadeSwapped && c.suit === '♣'));
+                
                 spadeCards.forEach(card => gameState.fieldCards.push(card));
                 const spadesPower = spadeCards.reduce((sum, c) => sum + c.value, 0);
                 skillEffects.push(`护盾+${spadesPower}`);
@@ -798,9 +886,13 @@ function executeCombo(cards) {
                 playSound('bossVictory');
                 addLogEntry(CONFIG.UI_TEXT.LOGS.BOSS_DEFEATED, 'error');
             }
+
+            // [FIX] 必须在 updateUI 之前重置，否则 UI 会渲染旧次数 (v2.9.7)
+            resetTurnSkills();
             
             updateUI();
             const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+
             if (currentPlayer.isAI) {
                 if (typeof triggerAITurn === 'function') {
                     setTimeout(() => triggerAITurn(), window.aiDelay || 1500);
@@ -853,7 +945,7 @@ function nextBoss() {
     // [NEW] 动态设置 Boss 左上角水印 (v2.4.4)
     const suitNameMapEng = { '♣': 'club', '♠': 'spade', '♦': 'diamond', '♥': 'heart' };
     const suitEng = suitNameMapEng[newBossCard.suit];
-    const bossImgSrc = `assets/boss_${suitEng}_${newBossCard.rank.toLowerCase()}.png`;
+    const bossImgSrc = `assets/bosses/boss_${suitEng}_${newBossCard.rank.toLowerCase()}.png`;
     const centerStage = document.querySelector('.center-stage');
     if (centerStage) {
         centerStage.style.setProperty('--boss-watermark', `url('${bossImgSrc}')`);
@@ -940,6 +1032,12 @@ function passTurn() {
     gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
     gameState.phase = 'TURN_START';
     gameState.currentTurnActionCount = 0; // 重置行为计数
+
+    // [MOD] 重构为通用重置方法 (v2.9.6)
+    if (gameState.currentPlayerIndex === 0) {
+        resetTurnSkills();
+    }
+
     updateUI();
     
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
@@ -957,6 +1055,20 @@ function passTurn() {
 // =============================================================================
 // 6. UI RENDERING & ANIMATIONS
 // =============================================================================
+function resetTurnSkills() {
+    // 重置人类玩家技能
+    if (gameState.character && gameState.character.skillResetType === 'TURN') {
+        const charData = CONFIG.CHARACTERS[gameState.character.id];
+        gameState.character.chargesLeft = charData.skills.charges(gameState.character.level);
+    }
+    // 重置当前 AI 玩家技能（如果后续 AI 也能用主动技）
+    const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+    if (currentPlayer && currentPlayer.isAI && currentPlayer.skillResetType === 'TURN') {
+        const aiCharData = CONFIG.CHARACTERS[currentPlayer.charId];
+        currentPlayer.chargesLeft = aiCharData.skills.charges(currentPlayer.level || 1);
+    }
+}
+
 function showStartScreen() {
     applyStaticUI();
     if (elements.startScreen) elements.startScreen.style.display = 'flex';
@@ -1146,19 +1258,45 @@ function updateUI() {
                 battleLine.style.setProperty('--watermark-img', `url('${charData.portrait}')`);
             }
 
-            if (elements.jokerCountText) elements.jokerCountText.textContent = gameState.character.chargesLeft;
-
             if (elements.jokerBtn) {
                 // 更新图标与技能名
                 const iconSpan = elements.jokerBtn.querySelector('.icon');
                 if (iconSpan) iconSpan.textContent = charData.skills.icon;
 
                 if (elements.jokerSkillName) {
-                    elements.jokerSkillName.textContent = (gameState.character.id === 'BARD') ? '万能之手' : '使用 Joker';
+                    if (gameState.character.id === 'BARD') {
+                        elements.jokerSkillName.textContent = '万能之手';
+                        if (elements.jokerCountText) elements.jokerCountText.textContent = gameState.character.chargesLeft;
+                        elements.jokerBtn.disabled = gameState.character.chargesLeft <= 0 || gameState.phase !== 'TURN_START';
+                    } else if (gameState.character.id === 'ALCHEMIST') {
+                        // 炼金术士动态显示：选了牌显示“交换”，没选牌且 Lv3 显示“阵”
+                        if (selectedCardsForCombo.length > 0) {
+                            elements.jokerSkillName.textContent = '等价交换';
+                            if (elements.jokerCountText) elements.jokerCountText.textContent = gameState.character.chargesLeft;
+                            elements.jokerBtn.disabled = gameState.character.chargesLeft <= 0 || gameState.phase !== 'TURN_START';
+                        } else if (gameState.character.level >= 3) {
+                            elements.jokerSkillName.textContent = '大炼成阵';
+                            if (elements.jokerCountText) elements.jokerCountText.textContent = gameState.character.ultCharges;
+                            elements.jokerBtn.disabled = gameState.character.ultCharges <= 0 || gameState.phase !== 'TURN_START';
+                        } else {
+                            elements.jokerSkillName.textContent = '等价交换';
+                            if (elements.jokerCountText) elements.jokerCountText.textContent = gameState.character.chargesLeft;
+                            elements.jokerBtn.disabled = true; // 没选牌时等价交换不可点
+                        }
+                    } else if (gameState.character.id === 'CHOSEN_ONE') {
+                        elements.jokerSkillName.textContent = '使用 Joker';
+                        if (elements.jokerCountText) elements.jokerCountText.textContent = gameState.character.chargesLeft;
+                        elements.jokerBtn.disabled = gameState.character.chargesLeft <= 0 || gameState.phase !== 'TURN_START';
+                    } else if (gameState.character.id === 'ZHAO_YUN') {
+                        elements.jokerSkillName.textContent = '龙胆 (被动)';
+                        if (elements.jokerCountText) elements.jokerCountText.textContent = '-';
+                        elements.jokerBtn.disabled = true;
+                    } else if (gameState.character.id === 'MONK') {
+                        elements.jokerSkillName.textContent = '震慑拳 (被动)';
+                        if (elements.jokerCountText) elements.jokerCountText.textContent = '-';
+                        elements.jokerBtn.disabled = true;
+                    }
                 }
-
-                // 技能可用性判定：只受限于次数和阶段
-                elements.jokerBtn.disabled = gameState.character.chargesLeft <= 0 || gameState.phase !== 'TURN_START';
             }
         }
 
@@ -1538,6 +1676,8 @@ function triggerCharacterSkill() {
         executeChosenOneSkill();
     } else if (gameState.character.id === 'BARD') {
         executeBardSkill();
+    } else if (gameState.character.id === 'ALCHEMIST') {
+        executeAlchemistSkill();
     }
 }
 
@@ -1600,6 +1740,92 @@ function executeBardSkill() {
     updateUI();
 }
 
+function executeAlchemistSkill() {
+    const player = gameState.players[0]; // 玩家
+    if (selectedCardsForCombo.length > 0) {
+        if (gameState.character.chargesLeft <= 0) {
+            showToastMessage('⚗️ 本回合等价交换次数已用完');
+            return;
+        }
+        if (selectedCardsForCombo.length !== 1) {
+            showToastMessage('⚗️ 等价交换：请精确选择 1 张手牌');
+            return;
+        }
+        const result = performEquivalentExchange(player, selectedCardsForCombo[0]);
+        if (result) {
+            const suitMap = { '♣': '梅花', '♠': '黑桃', '♦': '方片', '♥': '红桃' };
+            showToastMessage('⚗️ 等价交换完成');
+            addLogEntry(`⚗️ 炼金术士【等价交换】：${suitMap[result.handCard.suit]}${result.handCard.rank} ↔ ${suitMap[result.graveCard.suit]}${result.graveCard.rank}`, 'skill');
+            playSound('draw');
+        }
+        selectedCardsForCombo = [];
+    } else {
+        if (gameState.character.level < 3) {
+            showToastMessage('⚗️ 请先选择 1 张手牌进行等价交换');
+            return;
+        }
+        if (gameState.character.ultCharges <= 0) {
+            showToastMessage('⚗️ 大炼成阵每局仅限使用一次');
+            return;
+        }
+        performGrandTransmutation(player);
+        gameState.character.ultCharges--;
+    }
+}
+
+function performEquivalentExchange(player, handCard) {
+    if (gameState.discardPile.length === 0) return null;
+    const graveCard = gameState.discardPile.pop();
+    const handIdx = player.hand.findIndex(c => c.id === handCard.id);
+    if (handIdx !== -1) {
+        player.hand[handIdx] = graveCard;
+        gameState.discardPile.push(handCard);
+        if (player.level >= 2 && handCard.suit === graveCard.suit) {
+            drawCards(player, 1);
+            addLogEntry(`✨ 触发【贤者之石】：${player.name} 获得了额外抽牌！`, 'skill');
+        }
+        player.chargesLeft--;
+        updateUI();
+        return { handCard, graveCard };
+    }
+    return null;
+}
+
+function performGrandTransmutation(player) {
+    gameState.playerDeck.push(...player.hand);
+    gameState.playerDeck.push(...gameState.discardPile);
+    player.hand = [];
+    gameState.discardPile = [];
+    gameState.playerDeck = shuffleArray(gameState.playerDeck);
+    drawCards(player, player.maxHandSize);
+    
+    addLogEntry(`🔮 [${player.name}] 发动【大炼成阵】：全资源回流！`, 'skill');
+    showToastMessage('🔮 大炼成阵！生命在于循环');
+    playSound('revive');
+    updateUI();
+}
+
+function executeAlchemistSkillForAI(aiPlayer) {
+    // 1. 大炼成阵逻辑 (绝境重洗)
+    if (aiPlayer.level >= 3 && aiPlayer.ultCharges > 0 && aiPlayer.hand.length <= 2) {
+        performGrandTransmutation(aiPlayer);
+        aiPlayer.ultCharges--;
+        return true;
+    }
+
+    // 2. 等价交换逻辑 (找回墓地高分牌)
+    if (aiPlayer.chargesLeft > 0 && gameState.discardPile.length > 0) {
+        const topGrave = gameState.discardPile[gameState.discardPile.length - 1];
+        if (topGrave.value >= 8) {
+            const trashCard = [...aiPlayer.hand].sort((a,b) => a.value - b.value)[0];
+            if (trashCard && trashCard.value < 5) {
+                return performEquivalentExchange(aiPlayer, trashCard) !== null;
+            }
+        }
+    }
+    return false;
+}
+
 function executeChosenOneSkillForPlayer(player) {
     gameState.currentBoss.isSpecialDisabled = true;
     gameState.discardPile.push(...player.hand);
@@ -1616,7 +1842,8 @@ function executeChosenOneSkillForPlayer(player) {
         drawn++;
     }
 
-    player.chargesLeft--;
+    if (player.chargesLeft !== undefined) player.chargesLeft--;
+    else if (gameState.character && player === gameState.players[0]) gameState.character.chargesLeft--;
 
     addLogEntry(`🃏 [${player.name}] 使用 Joker！Boss技能失效并重置手牌`, 'skill');
     showToastMessage(`🃏 [${player.name}] 发动了 Joker！`);
@@ -1859,6 +2086,8 @@ function handleAIOffense(aiPlayer) {
             }
         } else if (aiPlayer.charId === 'BARD') {
             skillUsed = executeBardSkillForAI(aiPlayer);
+        } else if (aiPlayer.charId === 'ALCHEMIST') {
+            skillUsed = executeAlchemistSkillForAI(aiPlayer);
         }
 
         if (skillUsed) {
@@ -1916,7 +2145,16 @@ function calculateAIOffense(hand, currentBoss, strategy) {
     if (strategy === 'aggressive') preferredSuits = ['♣', '♦', '♠', '♥'];
 
     for (const suit of preferredSuits) {
-        const combo = findBestComboBySuit(hand, suit, immuneSuit);
+        // [MOD] AI 赵云花色评估 (v2.9.12)
+        let evaluationSuit = suit;
+        if (aiPlayer.charId === 'ZHAO_YUN') {
+            if (suit === '♣' && aiPlayer.level >= 1) evaluationSuit = '♠'; // 想要草花？黑桃也行
+            if (suit === '♠' && aiPlayer.level >= 1) evaluationSuit = '♣'; // 想要黑桃？草花也行
+            if (suit === '♦' && aiPlayer.level >= 2) evaluationSuit = '♥';
+            if (suit === '♥' && aiPlayer.level >= 2) evaluationSuit = '♦';
+        }
+        
+        const combo = findBestComboBySuit(aiPlayer.hand, suit, immuneSuit, aiPlayer);
         if (combo) return { selectedCards: combo };
     }
 
@@ -1942,11 +2180,23 @@ function findSpecificDamageCombo(hand, targetDamage, immuneSuit) {
 }
 
 // 辅助：根据花色偏好寻找最有价值 Combo
-function findBestComboBySuit(hand, preferredSuit, immuneSuit) {
+function findBestComboBySuit(hand, preferredSuit, immuneSuit, aiPlayer) {
     if (preferredSuit === immuneSuit) return null;
 
-    const allLegalCombos = getAllLegalCombos(hand);
-    const suitCombos = allLegalCombos.filter(combo => combo.some(c => c.suit === preferredSuit));
+    const allLegalCombos = getAllLegalCombos(hand, aiPlayer);
+    const suitCombos = allLegalCombos.filter(combo => {
+        // [MOD] 支持武僧/赵云的花色判定
+        return combo.some(c => {
+            if (c.suit === preferredSuit) return true;
+            if (aiPlayer && aiPlayer.charId === 'ZHAO_YUN') {
+                if (preferredSuit === '♣' && c.suit === '♠' && aiPlayer.level >= 1) return true;
+                if (preferredSuit === '♠' && c.suit === '♣' && aiPlayer.level >= 1) return true;
+                if (preferredSuit === '♦' && c.suit === '♥' && aiPlayer.level >= 2) return true;
+                if (preferredSuit === '♥' && c.suit === '♦' && aiPlayer.level >= 2) return true;
+            }
+            return false;
+        });
+    });
 
     if (suitCombos.length === 0) return null;
 
@@ -1961,9 +2211,18 @@ function findBestComboBySuit(hand, preferredSuit, immuneSuit) {
 }
 
 // 辅助：列出所有合法的单卡及简单 Combo (Pets, Multiples)
-function getAllLegalCombos(hand) {
+function getAllLegalCombos(hand, aiPlayer) {
     const combos = [];
     
+    // [MOD] 动态连招上限 (v2.9.12)
+    let comboLimit = 10;
+    if (aiPlayer && aiPlayer.charId === 'MONK') {
+        const lv = aiPlayer.level || 1;
+        if (lv >= 3) comboLimit = 40;
+        else if (lv >= 2) comboLimit = 20;
+        else comboLimit = 15;
+    }
+
     // 1. 单卡
     hand.forEach(c => combos.push([c]));
 
@@ -1974,7 +2233,7 @@ function getAllLegalCombos(hand) {
         others.forEach(o => combos.push([a, o]));
     });
 
-    // 3. 同点数组合 (Sum <= 10)
+    // 3. 同点数组合 (Sum <= limit)
     const byRank = {};
     hand.forEach(c => {
         if (c.rank === 'A') return; // A 不进点数组合
@@ -1985,9 +2244,9 @@ function getAllLegalCombos(hand) {
     for (const rank in byRank) {
         const cards = byRank[rank];
         const val = cards[0].value;
-        if (cards.length >= 2 && val * 2 <= 10) combos.push([cards[0], cards[1]]);
-        if (cards.length >= 3 && val * 3 <= 10) combos.push([cards[0], cards[1], cards[2]]);
-        if (cards.length >= 4 && val * 4 <= 10) combos.push([cards[0], cards[1], cards[2], cards[3]]);
+        if (cards.length >= 2 && val * 2 <= comboLimit) combos.push([cards[0], cards[1]]);
+        if (cards.length >= 3 && val * 3 <= comboLimit) combos.push([cards[0], cards[1], cards[2]]);
+        if (cards.length >= 4 && val * 4 <= comboLimit) combos.push([cards[0], cards[1], cards[2], cards[3]]);
     }
 
     return combos;

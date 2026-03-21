@@ -16,8 +16,7 @@
     <!-- 开始游戏画面 -->
     <div class="start-screen" id="startScreen">
         <div class="start-screen-inner">
-            <!-- 修复路径：使用本地生成的 startup_bg.png -->
-            <img src="startup_bg.png" class="start-screen-image-bg" id="startScreenImage" alt="Regicide Startup Background">
+            <img src="assets/ui/startup_bg.png" class="start-screen-image-bg" id="startScreenImage" alt="Regicide Startup Background">
             <div class="start-content-overlay">
                 <div class="start-screen-title serif">--</div>
                 <div class="start-screen-subtitle">--</div>
@@ -36,7 +35,7 @@
             <div class="char-layout">
                 <div class="char-portrait-box">
                     <button class="nav-btn prev" id="prevCharBtn">◀</button>
-                    <img id="charPortrait" src="assets/char_chosen_one.png" alt="Portrait">
+                    <img id="charPortrait" src="assets/characters/char_chosen_one.png" alt="Portrait">
                     <div class="char-lv-badge">Lv.<span id="charLevel">1</span></div>
                     <button class="nav-btn next" id="nextCharBtn">▶</button>
                 </div>
@@ -213,12 +212,15 @@
 
                 <div class="battle-line">
                     <div class="battle-header">
-                        <div class="field-title"></div>
-                        <div class="char-badge hidden" id="hudCharBadge">
-                            <img src="assets/char_chosen_one.png" alt="Character Avatar" class="char-avatar"
-                                id="hudCharPortrait">
-                            <span class="name" id="hudCharName">--</span>
-                            <span class="lv" id="hudCharLv">--</span>
+                        <div class="battle-header-left"></div> <!-- 保持原本左右平分的占位 -->
+                        <div class="right-hud-group">
+                            <div class="char-badge hidden" id="hudCharBadge">
+                                <img src="assets/characters/char_chosen_one.png" alt="Character Avatar" class="char-avatar"
+                                    id="hudCharPortrait">
+                                <span class="name" id="hudCharName">--</span>
+                                <span class="lv" id="hudCharLv">--</span>
+                            </div>
+                            <div class="field-title"></div>
                         </div>
                     </div>
                     <div class="field-cards" id="fieldCards"></div>
