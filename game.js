@@ -16,7 +16,7 @@
 // 1. CONFIG & CONSTANTS
 // =============================================================================
 const CONFIG = {
-    VERSION: '2.9.12',
+    VERSION: '2.12.0',
     CARD_VALUES: {
         'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
         'J': 10, 'Q': 10, 'K': 10, 'JOKER': 0
@@ -117,12 +117,46 @@ const CONFIG = {
                 charges: (lv) => 0,
                 resetType: (lv) => 'GAME'
             }
+        },
+        'GAMBLER': {
+            name: '赌徒',
+            id: 'GAMBLER',
+            portrait: 'assets/characters/char_gambler.png',
+            bio: '高风险极高回报。用筹码丈量命运，用生死交换狂欢。',
+            abilities: {
+                lv1: '【孤注一掷】: 每当出牌，随机抽 1，若花色与出牌相同则获得。',
+                lv2: '【无限绿波】: 每当获得卡牌，若花色与该牌相同则再次随机抽牌，可无限触发。',
+                lv3: '【天命在我】: 判定条件升级为：花色相同 或 点数相同。'
+            },
+            skills: {
+                id: 'PASSIVE',
+                icon: '🎲',
+                charges: (lv) => 0,
+                resetType: (lv) => 'GAME'
+            }
+        },
+        'ASSASSIN': {
+            name: '刺客',
+            id: 'ASSASSIN',
+            portrait: 'assets/characters/char_assassin.png',
+            bio: '精准斩杀与连击爆发，强调"一击必杀"的窗口期。',
+            abilities: {
+                lv1: '【背刺】: 第一张打出的牌如果是 ♣，点数翻倍。',
+                lv2: '【连杀】: 用 ♣ 击败 Boss 后从酒馆或墓地抽 2 张。',
+                lv3: '【死亡标记】: 每回合限一次。标记当前 Boss，全手牌附带 ♣ 翻倍效果。'
+            },
+            skills: {
+                id: 'DEATH_MARK',
+                icon: '🎯',
+                charges: (lv) => (lv >= 3 ? 1 : 0),
+                resetType: (lv) => 'TURN'
+            }
         }
     },
-    // 升级胜场阈值
+    // 升级 EXP 阈值 (v2.12.0 重构：胜获 5 经验，败获 1 经验)
     UPGRADE_REQUIREMENTS: {
-        lv2: 1, // 1 胜升级 lv2
-        lv3: 3  // 3 胜升级 lv3
+        lv2: 5,  // 对应之前的 1 胜
+        lv3: 15  // 对应之前的 3 胜
     },
     // 游戏规则配置
     GAME_RULES: [
@@ -176,7 +210,11 @@ const CONFIG = {
             ACHIEVEMENTS_NAME: '成就馆',
             ACHIEVEMENTS_DESC: '回顾你的辉煌时刻',
             SELECT_CHAR: '选择主角 / CHARACTER',
-            CHAR_WINS_LABEL: '当前胜场:'
+            CHAR_EXP_LABEL: '当前等级:',
+            CHAR_TOTAL_STATS: '实战统计:',
+            TOTAL_WINS: '获得胜利:',
+            TOTAL_GAMES: '参与场次:',
+            CURRENT_EXP: '当前经验:'
         },
         HEADERS: {
             RULES: '📜 游戏规则',
@@ -257,7 +295,7 @@ let hasGameStarted = false;
 let bgmAudio = null;
 let currentBgmSrc = null;
 let charSelectionIndex = 0; // [NEW] 追踪当前选择的角色索引 (v2.4.0)
-const CHAR_IDS = ['CHOSEN_ONE', 'BARD', 'ZHAO_YUN', 'ALCHEMIST', 'MONK']; // [NEW] 可选角色列表 (v2.4.0)
+const CHAR_IDS = ['CHOSEN_ONE', 'BARD', 'ZHAO_YUN', 'ALCHEMIST', 'MONK', 'GAMBLER', 'ASSASSIN']; // [NEW] 可选角色列表 (v2.4.0)
 
 // [NEW] AI 队友配置 (v2.5.0)
 // 数据结构示例: [{ id: 'AI_1', name: 'AI-1', strategy: 'balanced', isAI: true }]
@@ -329,23 +367,52 @@ const elements = {
 // =============================================================================
 // PROGRESSION SYSTEM (v2.0.0)
 // =============================================================================
+/**
+ * 📊 进度与统计系统 (v2.12.0)
+ * 存储结构: { total: {games, wins, exp}, chars: { id: {games, wins, exp} } }
+ */
 const ProgressionTracker = {
-    saveWin: function (charId) {
+    STORAGE_KEY: 'rgc_global_stats',
+
+    saveResult: function (charId, isWin, isOnline = false) {
         const stats = this.getStats();
-        stats[charId] = (stats[charId] || 0) + 1;
-        localStorage.setItem('rgc_char_stats', JSON.stringify(stats));
-        return stats[charId];
+        const expGain = isWin ? 5 : 1;
+
+        // 1. 更新总计
+        stats.total.games++;
+        if (isWin) stats.total.wins++;
+        stats.total.exp += expGain;
+
+        // 2. 更新角色统计
+        if (!stats.chars[charId]) {
+            stats.chars[charId] = { games: 0, wins: 0, exp: 0 };
+        }
+        stats.chars[charId].games++;
+        if (isWin) stats.chars[charId].wins++;
+        stats.chars[charId].exp += expGain;
+
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(stats));
+        return stats.chars[charId];
     },
-    getWins: function (charId) {
-        return this.getStats()[charId] || 0;
+
+    getCharStats: function (charId) {
+        const stats = this.getStats();
+        return stats.chars[charId] || { games: 0, wins: 0, exp: 0 };
     },
+
     getStats: function () {
-        const saved = localStorage.getItem('rgc_char_stats');
-        return saved ? JSON.parse(saved) : {};
+        const saved = localStorage.getItem(this.STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+        // 初始化
+        return {
+            total: { games: 0, wins: 0, exp: 0 },
+            chars: {}
+        };
     },
-    calculateLevel: function (wins) {
-        if (wins >= CONFIG.UPGRADE_REQUIREMENTS.lv3) return 3;
-        if (wins >= CONFIG.UPGRADE_REQUIREMENTS.lv2) return 2;
+
+    calculateLevel: function (exp) {
+        if (exp >= CONFIG.UPGRADE_REQUIREMENTS.lv3) return 3;
+        if (exp >= CONFIG.UPGRADE_REQUIREMENTS.lv2) return 2;
         return 1;
     }
 };
@@ -526,8 +593,11 @@ function initGame() {
 
     // [NEW] 动态生成 players 数组
     const totalPlayers = 1 + selectedAIs.length;
-    const maxHandSize = CONFIG.HAND_LIMIT[totalPlayers] || 5;
+    const baseHandSize = CONFIG.HAND_LIMIT[totalPlayers] || 5;
     
+    // 计算特定角色的手牌上限红利 (v2.10.1)
+    const getFinalHandSize = (id) => (id === 'GAMBLER' ? baseHandSize + 2 : baseHandSize);
+
     const players = [{
         id: 'player_1',
         name: charData.name,
@@ -535,25 +605,26 @@ function initGame() {
         charId: charId,
         level: gameState.character.level,
         hand: [],
-        maxHandSize: maxHandSize
+        maxHandSize: getFinalHandSize(charId)
     }];
 
     // 将选定的 AI 加入队伍
     selectedAIs.forEach((aiConfig, index) => {
-        const charData = CONFIG.CHARACTERS[aiConfig.charId] || CONFIG.CHARACTERS['CHOSEN_ONE'];
+        const aiCharId = aiConfig.charId || 'CHOSEN_ONE';
+        const aiCharData = CONFIG.CHARACTERS[aiCharId];
         const level = 1;
         players.push({
             id: aiConfig.id,
-            name: `${aiConfig.name} (${charData.name})`,
+            name: `${aiConfig.name} (${aiCharData.name})`,
             isAI: true,
             strategy: aiConfig.strategy,
-            charId: aiConfig.charId || 'CHOSEN_ONE',
+            charId: aiCharId,
             level: level,
-            chargesLeft: charData.skills.charges(level),
-            maxCharges: charData.skills.charges(level),
-            skillResetType: charData.skills.resetType(level),
+            chargesLeft: aiCharData.skills.charges(level),
+            maxCharges: aiCharData.skills.charges(level),
+            skillResetType: aiCharData.skills.resetType(level),
             hand: [],
-            maxHandSize: maxHandSize
+            maxHandSize: getFinalHandSize(aiCharId)
         });
     });
 
@@ -678,6 +749,11 @@ function drawCards(player, count) {
         if (player.hand.length >= player.maxHandSize) break;
         const card = gameState.playerDeck.pop();
         player.hand.push(card);
+
+        // [NEW] 赌徒：无限绿波 (v2.10.3)
+        if (player.charId === 'GAMBLER' && player.level >= 2) {
+            setTimeout(() => triggerGamblerSkills(player, card, 'GREEN_WAVE'), 100);
+        }
     }
 }
 
@@ -718,7 +794,6 @@ function executeCombo(cards) {
 
     const cardNames = cards.map(card => `${card.suit}${card.rank}`).join('+');
     addLogEntry(`玩家 ${player.name} 出牌: ${cardNames}`, 'skill');
-    gameState.currentTurnActionCount++; // 行动计数自增
     playSound('playCard');
 
     cards.forEach(card => {
@@ -728,34 +803,71 @@ function executeCombo(cards) {
 
     if (cards.length === 1) {
         comboDamage = cards[0].value;
+        // [NEW] 刺客【背刺】逻辑 (v2.11.0)
+        if (player.charId === 'ASSASSIN' && player.level >= 1 && gameState.currentTurnActionCount === 0 && cards[0].suit === '♣') {
+            comboDamage *= 2;
+            addLogEntry(`🗡️ 刺客【背刺】：首张 ♣ 命中核心！点数翻倍至 ${comboDamage}`, 'skill');
+        }
         comboSkills.add(cards[0].suit);
         comboType = '单张';
     } else if (cards.length === 2 && cards.some(c => c.rank === 'A')) {
         const aceCard = cards.find(c => c.rank === 'A');
         const otherCard = cards.find(c => c.rank !== 'A');
         comboDamage = 1 + otherCard.value;
+        // [NEW] 刺客【背刺】对宠物组合的支持
+        if (player.charId === 'ASSASSIN' && player.level >= 1 && gameState.currentTurnActionCount === 0 && cards.some(c => c.suit === '♣')) {
+             comboDamage *= 2; // 简化为全额翻倍
+             addLogEntry(`🗡️ 刺客【背刺】：宠物突袭！点数翻倍至 ${comboDamage}`, 'skill');
+        }
         comboSkills.add(aceCard.suit);
         comboSkills.add(otherCard.suit);
         comboType = '宠物组合';
         addLogEntry(`宠物组合: ${aceCard.suit}${aceCard.rank} + ${otherCard.suit}${otherCard.rank}`, 'skill');
     } else {
         comboDamage = cards.reduce((sum, card) => sum + card.value, 0);
+        // [NEW] 刺客【背刺】对连招的支持
+        if (player.charId === 'ASSASSIN' && player.level >= 1 && gameState.currentTurnActionCount === 0 && cards[0].suit === '♣') {
+            comboDamage *= 2;
+            addLogEntry(`🗡️ 刺客【背刺】：潜行突刺！点数翻倍至 ${comboDamage}`, 'skill');
+        }
         cards.forEach(card => comboSkills.add(card.suit));
         comboType = '连招';
         addLogEntry(`连招: ${cards.length}张${cards[0].rank}`, 'skill');
+
+        // [NEW] 武僧：突破限制展示 (v2.10.4)
+        if (player.charId === 'MONK' && comboDamage > 10) {
+            const limit = player.level >= 3 ? 40 : (player.level >= 2 ? 20 : 15);
+            addLogEntry(`👊 武僧【震慑拳】：连招爆发！突破 10 点上限，当前上限 ${limit} 点`, 'skill');
+        }
     }
 
-    // [NEW] 赵云被动逻辑：花色转换 (v2.9.4)
+    // [NEW] 刺客【死亡标记】判定 (v2.11.0)
+    if (gameState.currentBoss.isMarked) {
+        comboSkills.add('♣');
+        addLogEntry('🎯 触发【死亡标记】：全部手牌附带 ♣ 效果（伤害翻倍/标记增幅）！', 'skill');
+    }
+
+    // [NEW] 赵云被动逻辑：花色转换详细日志 (v2.10.4)
     if (player.charId === 'ZHAO_YUN') {
         const tempSkills = new Set(comboSkills);
         tempSkills.forEach(suit => {
             if (player.level >= 1) {
-                if (suit === '♠') comboSkills.add('♣');
-                else if (suit === '♣') comboSkills.add('♠');
+                if (suit === '♠' && !comboSkills.has('♣')) {
+                    comboSkills.add('♣');
+                    addLogEntry('🐉 赵云【龙胆】：黑桃触发梅花判定（伤害翻倍）！', 'skill');
+                } else if (suit === '♣' && !comboSkills.has('♠')) {
+                    comboSkills.add('♠');
+                    addLogEntry('🐉 赵云【龙胆】：梅花触发黑桃判定（获得护盾）！', 'skill');
+                }
             }
             if (player.level >= 2) {
-                if (suit === '♥') comboSkills.add('♦');
-                else if (suit === '♦') comboSkills.add('♥');
+                if (suit === '♥' && !comboSkills.has('♦')) {
+                    comboSkills.add('♦');
+                    addLogEntry('🐉 赵云【龙胆】：红桃触发方片判定（全队补给）！', 'skill');
+                } else if (suit === '♦' && !comboSkills.has('♥')) {
+                    comboSkills.add('♥');
+                    addLogEntry('🐉 赵云【龙胆】：方片触发红桃判定（回复生命）！', 'skill');
+                }
             }
         });
     }
@@ -770,6 +882,10 @@ function executeCombo(cards) {
         if (!isZhaoYunLv3 && gameState.currentBoss.currentBoss.suit === suit && !gameState.currentBoss.isSpecialDisabled) {
             addLogEntry(`${suit}技能被免疫`, 'error');
             return;
+        }
+
+        if (isZhaoYunLv3 && gameState.currentBoss.currentBoss.suit === suit && !gameState.currentBoss.isSpecialDisabled) {
+            addLogEntry(`🐉 赵云【龙胆】：无视 Boss 的 ${suit} 技能免疫！`, 'skill');
         }
 
         switch (suit) {
@@ -858,6 +974,15 @@ function executeCombo(cards) {
     showScreenDamageEffect(finalDamage, comboType);
     updateFieldCards();
     updateShieldEffect();
+
+    // [NEW] 赌徒：孤注一掷 (Draft v2.10.0)
+    const activePlayer = gameState.players[gameState.currentPlayerIndex];
+    if (activePlayer.charId === 'GAMBLER') {
+        const lastCard = cards[cards.length - 1]; // 以最后一张为判定参照
+        addLogEntry(`🎲 赌徒【孤注一掷】准备判定：出牌参照为 ${lastCard.suit}${lastCard.rank}`, 'normal');
+        triggerGamblerSkills(activePlayer, lastCard, 'ALL_IN');
+    }
+
     updateUI();
 
     if (gameState.currentBoss.currentHP <= 0) {
@@ -875,6 +1000,25 @@ function executeCombo(cards) {
             });
         }
 
+        // [NEW] 刺客【连杀】奖励 (v2.11.0)
+        if (player.charId === 'ASSASSIN' && player.level >= 2 && comboSkills.has('♣')) {
+            addLogEntry('🗡️ 刺客【连杀】：绝命一击！准备补给资源...', 'skill');
+            // 从酒馆和墓地各摸
+            let rewards = 0;
+            if (gameState.discardPile.length > 0) {
+                player.hand.push(gameState.discardPile.pop());
+                rewards++;
+            }
+            if (gameState.playerDeck.length > 0 && rewards < 2) {
+                player.hand.push(gameState.playerDeck.pop());
+                rewards++;
+            }
+            if (rewards > 0) {
+                addLogEntry(`🗡️ 【连杀】完成：获得了 ${rewards} 张手牌奖励`, 'skill');
+                playSound('draw');
+            }
+        }
+
         setTimeout(() => {
             if (!nextBoss()) {
                 playSound('gameVictory'); // [NEW] 播放通关音效
@@ -889,6 +1033,7 @@ function executeCombo(cards) {
 
             // [FIX] 必须在 updateUI 之前重置，否则 UI 会渲染旧次数 (v2.9.7)
             resetTurnSkills();
+            gameState.currentBoss.isMarked = false; // [NEW] Boss 击败后清理标记 (v2.11.0)
             
             updateUI();
             const currentPlayer = gameState.players[gameState.currentPlayerIndex];
@@ -907,6 +1052,8 @@ function executeCombo(cards) {
             handleBossCounterAttack();
         }, 1500);
     }
+    
+    gameState.currentTurnActionCount++; // [FIX] 流程自增放在结尾 (v2.11.1)
 }
 
 function getTotalShieldValue() {
@@ -1151,14 +1298,30 @@ function saveAiConfiguration() {
 
 function showCharSelection(charId) {
     const charData = CONFIG.CHARACTERS[charId];
-    const wins = ProgressionTracker.getWins(charId);
-    const lv = ProgressionTracker.calculateLevel(wins);
+    const stats = ProgressionTracker.getCharStats(charId);
+    const lv = ProgressionTracker.calculateLevel(stats.exp);
 
     elements.charSelection.style.display = 'flex';
     elements.charName.textContent = charData.name;
     elements.charBio.textContent = charData.bio;
     elements.charLevel.textContent = lv;
-    elements.charWins.textContent = wins;
+
+    // 更新详细统计信息 (v2.12.0)
+    const winsLabel = document.querySelector('.win-progression .label');
+    if (winsLabel) {
+        winsLabel.textContent = `等级能力 (当前 EXP: ${stats.exp})`;
+        winsLabel.style.color = 'var(--gold)';
+    }
+    const winVal = document.getElementById('charWins');
+    if (winVal) {
+        winVal.innerHTML = `
+            <div style="font-size: 0.85em; opacity: 0.9; line-height: 1.4; color: #fff;">
+                <span style="color:var(--gold)">实战:</span> ${stats.games} 场 | 
+                <span style="color:var(--gold)">胜场:</span> ${stats.wins} | 
+                <span style="color:var(--gold)">胜率:</span> ${stats.games > 0 ? ((stats.wins/stats.games)*100).toFixed(1) : 0}%
+            </div>
+        `;
+    }
 
     // 处理头像展示与回退逻辑
     const portraitImg = document.getElementById('charPortrait');
@@ -1295,6 +1458,12 @@ function updateUI() {
                         elements.jokerSkillName.textContent = '震慑拳 (被动)';
                         if (elements.jokerCountText) elements.jokerCountText.textContent = '-';
                         elements.jokerBtn.disabled = true;
+                    } else if (gameState.character.id === 'GAMBLER') {
+                        elements.jokerSkillName.textContent = '无限绿波 (被动)';
+                        if (elements.jokerCountText) elements.jokerCountText.textContent = '-';
+                        elements.jokerBtn.disabled = true;
+                    } else if (gameState.character.id === 'ASSASSIN') {
+                        elements.jokerSkillName.textContent = '死亡标记';
                     }
                 }
             }
@@ -1678,6 +1847,8 @@ function triggerCharacterSkill() {
         executeBardSkill();
     } else if (gameState.character.id === 'ALCHEMIST') {
         executeAlchemistSkill();
+    } else if (gameState.character.id === 'ASSASSIN') {
+        executeAssassinSkill();
     }
 }
 
@@ -1773,6 +1944,33 @@ function executeAlchemistSkill() {
     }
 }
 
+function executeAssassinSkill() {
+    if (gameState.character.chargesLeft <= 0) {
+        showToastMessage('🎯 本回合标记次数已耗尽');
+        return;
+    }
+    gameState.currentBoss.isMarked = true;
+    gameState.character.chargesLeft--;
+    addLogEntry(`🎯 刺客发动【死亡标记】：当前 Boss ${gameState.currentBoss.currentBoss.suit}${gameState.currentBoss.currentBoss.rank} 已被标记！`, 'skill');
+    showToastMessage('🎯 目标已锁定！所有手牌附带翻倍效果');
+    playSound('purify'); // 锁定音效
+    updateUI();
+}
+
+function executeAssassinSkillForAI(aiPlayer) {
+    if (aiPlayer.chargesLeft <= 0) return false;
+    
+    // 决策：如果当前 Boss 没被标记，且手牌中有较多 ♥/♠/♦（非♣牌），则开启标记提升斩杀线
+    if (!gameState.currentBoss.isMarked) {
+        const nonClubs = aiPlayer.hand.filter(c => c.suit !== '♣').length;
+        if (nonClubs >= 2) {
+            executeAssassinSkill(); // AI 借用玩家主动技执行器，逻辑一致
+            return true;
+        }
+    }
+    return false;
+}
+
 function performEquivalentExchange(player, handCard) {
     if (gameState.discardPile.length === 0) return null;
     const graveCard = gameState.discardPile.pop();
@@ -1851,6 +2049,62 @@ function executeChosenOneSkillForPlayer(player) {
     updateUI();
 }
 
+/**
+ * 🎲 赌徒核心逻辑：孤注一掷与无限绿波 (v2.10.2)
+ * @param {Object} player 触发玩家
+ * @param {Object} baseCard 判定参照卡
+ * @param {String} type 触发类型：'ALL_IN' (出牌) 或 'GREEN_WAVE' (获得牌)
+ */
+function triggerGamblerSkills(player, baseCard, type) {
+    if (!player || player.charId !== 'GAMBLER' || !baseCard) return;
+    const lv = player.level || 1;
+    const logTag = type === 'ALL_IN' ? '【孤注一掷】' : '【无限绿波】';
+    
+    if (gameState.playerDeck.length === 0) {
+        addLogEntry(`🎲 赌徒${logTag}：牌库已空，无法判定。`, 'normal');
+        return;
+    }
+
+    let isChaining = true;
+    while (isChaining && gameState.playerDeck.length > 0) {
+        const nextCard = gameState.playerDeck[gameState.playerDeck.length - 1]; // 查看预览
+        
+        const suitMatch = (nextCard.suit === baseCard.suit);
+        const rankMatch = (nextCard.rank === baseCard.rank);
+        let matched = suitMatch || (lv >= 3 && rankMatch);
+
+        const compareDesc = `判定基准(${baseCard.suit}${baseCard.rank}) vs 牌库顶(${nextCard.suit}${nextCard.rank})`;
+        
+        if (matched) {
+            const drawn = gameState.playerDeck.pop();
+            player.hand.push(drawn);
+            
+            const reason = suitMatch ? '花色相同' : '点数相同';
+            addLogEntry(`🎲 赌徒${logTag}：${compareDesc} -> 命中(${reason})！获得 ${drawn.suit}${drawn.rank}`, 'skill');
+            playSound('purify'); // 叮的一声感悟命运
+            
+            // LV1 只能触发一次，LV2+ 可递归（无限绿波）
+            if (lv < 2 || type === 'ALL_IN') {
+                // 如果是 ALL_IN 类型且 LV2+，后续获得的这枚新牌会触发 GREEN_WAVE 逻辑
+                if (lv >= 2) {
+                    // 交给下一轮 logic
+                    isChaining = false;
+                    setTimeout(() => triggerGamblerSkills(player, drawn, 'GREEN_WAVE'), 300);
+                } else {
+                    isChaining = false;
+                }
+            } else {
+                // 无限绿波：以新出的牌为基准继续赌
+                baseCard = drawn;
+            }
+        } else {
+            addLogEntry(`🎲 赌徒${logTag}：${compareDesc} -> 未命中。`, 'normal');
+            isChaining = false;
+        }
+    }
+    updateUI();
+}
+
 function executeBardSkillForAI(player) {
     const immuneSuit = gameState.currentBoss.isSpecialDisabled ? null : gameState.currentBoss.currentBoss.suit;
     const sorted = [...player.hand].sort((a,b) => a.value - b.value);
@@ -1895,8 +2149,15 @@ function drawWithOverflow(totalNeeded) {
 
     // 如果还不够，从酒馆（玩家牌组）抽取
     while (drawn < totalNeeded && gameState.playerDeck.length > 0) {
-        player.hand.push(gameState.playerDeck.pop());
+        const newCard = gameState.playerDeck.pop();
+        player.hand.push(newCard);
         drawn++;
+
+        // [NEW] 赌徒：无限绿波 (Draft v2.10.0)
+        if (player.charId === 'GAMBLER' && player.level >= 2) {
+            // 这里我们用 setTimeout 稍微错开，避免递归深度过大或 UI 瞬间爆炸
+            setTimeout(() => triggerGamblerSkills(player, newCard, 'GREEN_WAVE'), 100);
+        }
     }
 }
 
@@ -1925,13 +2186,15 @@ function showGameOver(isWin, message) {
     stopBgm();
 
     if (isWin) {
-        // 记录胜场
-        const newWins = ProgressionTracker.saveWin(gameState.character.id);
-        const newLv = ProgressionTracker.calculateLevel(newWins);
+        // 记录结果 (v2.12.0：通过记录结果自动增减 EXP 并返回最新状态)
+        const stats = ProgressionTracker.saveResult(gameState.character.id, true);
+        const newLv = ProgressionTracker.calculateLevel(stats.exp);
         if (newLv > gameState.character.level) {
             showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.CHAR_UPGRADE.replace('{lv}', newLv));
         }
     } else {
+        // 虽败犹荣：给予 1 EXP
+        ProgressionTracker.saveResult(gameState.character.id, false);
         playSound('gameOver');
     }
 }

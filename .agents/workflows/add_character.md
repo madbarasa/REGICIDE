@@ -25,6 +25,7 @@ description: 如何在《弑君者》中添加新角色
 - **主动型角色**：
   - 在 `triggerCharacterSkill` 中添加相应分支。
   - 实现具体的 `execute[CharName]Skill` 函数。
+- **战斗日志交互**：必须在技能触发、判定（如赌徒的命中/未匹配）、成功、失败等逻辑节点，使用 `addLogEntry` 输出带有角色特有图标（如 🎲, 👊, ⚗️）的详细日志，确保用户能通过日志审计技能正确性。
 
 ### 4. 制作 AI 适配 (game.js -> AI ENGINE)
 在 `handleAIOffense` 中实现该角色的技能决策逻辑：
