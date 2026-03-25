@@ -16,7 +16,7 @@
 // 1. CONFIG & CONSTANTS
 // =============================================================================
 const CONFIG = {
-    VERSION: '2.12.0',
+    VERSION: '2.12.3',
     CARD_VALUES: {
         'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
         'J': 10, 'Q': 10, 'K': 10, 'JOKER': 0
@@ -574,8 +574,8 @@ function initGame() {
     // 如果没有选定角色，默认选定天选之人（用于直接重启等场景）
     if (!gameState || !gameState.character) {
         const charId = 'CHOSEN_ONE';
-        const wins = ProgressionTracker.getWins(charId);
-        const level = ProgressionTracker.calculateLevel(wins);
+        const stats = ProgressionTracker.getCharStats(charId);
+        const level = ProgressionTracker.calculateLevel(stats.exp);
         applyCharacterToState(charId, level);
     }
 
@@ -1609,7 +1609,7 @@ function applyStaticUI() {
     const abilityTitleEl = document.querySelector('.char-ability-list h4');
     if (abilityTitleEl) abilityTitleEl.textContent = t.CHAR_PANEL.ABILITY_TITLE;
     const winsLabelEl = document.querySelector('.win-progression .label');
-    if (winsLabelEl) winsLabelEl.textContent = t.MENU.CHAR_WINS_LABEL;
+    if (winsLabelEl) winsLabelEl.textContent = t.MENU.CHAR_EXP_LABEL;
 
     // Buttons
     if (elements.playCardBtn) elements.playCardBtn.textContent = t.BUTTONS.PLAY;
@@ -1960,11 +1960,15 @@ function executeAssassinSkill() {
 function executeAssassinSkillForAI(aiPlayer) {
     if (aiPlayer.chargesLeft <= 0) return false;
     
-    // 决策：如果当前 Boss 没被标记，且手牌中有较多 ♥/♠/♦（非♣牌），则开启标记提升斩杀线
+    // 决策：如果当前 Boss 没被标记，且手牌中有较多非♣牌，则开启标记提升斩杀线
     if (!gameState.currentBoss.isMarked) {
         const nonClubs = aiPlayer.hand.filter(c => c.suit !== '♣').length;
         if (nonClubs >= 2) {
-            executeAssassinSkill(); // AI 借用玩家主动技执行器，逻辑一致
+            // 直接操作 AI 玩家状态，不借用人类玩家的 executeAssassinSkill
+            gameState.currentBoss.isMarked = true;
+            aiPlayer.chargesLeft--;
+            addLogEntry(`🎯 [${aiPlayer.name}] 发动【死亡标记】：Boss 已被标记！`, 'skill');
+            updateUI();
             return true;
         }
     }
@@ -2351,7 +2355,10 @@ function handleAIOffense(aiPlayer) {
             skillUsed = executeBardSkillForAI(aiPlayer);
         } else if (aiPlayer.charId === 'ALCHEMIST') {
             skillUsed = executeAlchemistSkillForAI(aiPlayer);
+        } else if (aiPlayer.charId === 'ASSASSIN') {
+            skillUsed = executeAssassinSkillForAI(aiPlayer);
         }
+        // GAMBLER / MONK / ZHAO_YUN: 纯被动角色，无主动技能，无需处理
 
         if (skillUsed) {
             // 使用技能后暂停一会重新评估局面（再走一次 AIOffense）
@@ -2360,7 +2367,7 @@ function handleAIOffense(aiPlayer) {
         }
     }
 
-    const { selectedCards } = calculateAIOffense(aiPlayer.hand, gameState.currentBoss, aiPlayer.strategy);
+    const { selectedCards } = calculateAIOffense(aiPlayer.hand, gameState.currentBoss, aiPlayer.strategy, aiPlayer);
 
     if (!selectedCards || selectedCards.length === 0) {
         skipTurn();
@@ -2370,7 +2377,7 @@ function handleAIOffense(aiPlayer) {
     }
 }
 
-function calculateAIOffense(hand, currentBoss, strategy) {
+function calculateAIOffense(hand, currentBoss, strategy, aiPlayer) {
     const immuneSuit = currentBoss.isSpecialDisabled ? null : currentBoss.currentBoss.suit;
     const bossHP = currentBoss.currentHP;
     const bossATK = currentBoss.currentATK;
