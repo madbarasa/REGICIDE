@@ -1915,3 +1915,196 @@ body {
 .center-stage::before {
     opacity: 0.1 !important; /* 进一步降低水印干扰 */
 }
+
+/* --- 神器系统样式总集 (v2.13.3) --- */
+.artifact-list {
+    display: flex;
+    gap: 4px;
+    margin-left: 10px;
+    flex-wrap: wrap;
+}
+
+.artifact-icon {
+    width: 24px;
+    height: 24px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--gold);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    user-select: none;
+}
+
+.artifact-icon:hover {
+    transform: scale(1.4);
+    z-index: 10;
+    box-shadow: 0 0 10px var(--gold);
+}
+
+.artifact-icon.quality-S { border-color: #ff00ff; box-shadow: 0 0 5px rgba(255,0,255,0.5); }
+.artifact-icon.quality-A { border-color: #ff9900; box-shadow: 0 0 5px rgba(255,153,0,0.5); }
+.artifact-icon.quality-B { border-color: #00ccff; box-shadow: 0 0 5px rgba(0,204,255,0.5); }
+
+/* 简易 Tooltip */
+.artifact-icon::after {
+    content: attr(data-desc);
+    position: absolute;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.9);
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 1000;
+    border: 1px solid var(--gold);
+}
+
+.artifact-icon:hover::after {
+    opacity: 1;
+}
+
+.tm-artifacts {
+    display: flex;
+    gap: 2px;
+    margin-top: 4px;
+}
+
+.tm-artifacts .artifact-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+}
+
+/* --- 神器详情浮窗美化与返回按钮调整 (v2.13.3) --- */
+.artifact-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    backdrop-filter: blur(8px);
+    animation: fadeIn 0.3s ease-out;
+}
+
+.artifact-modal .modal-content {
+    background: linear-gradient(145deg, #1a1a1a, #111);
+    width: 380px;
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.05);
+    padding: 60px 24px 24px 24px; /* 为左上角返回按钮预留空间 */
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    position: relative;
+    overflow: hidden;
+}
+
+.artifact-modal .modal-content.quality-S { border-color: #ff00ff; box-shadow: 0 0 30px rgba(255,0,255,0.2); }
+.artifact-modal .modal-content.quality-A { border-color: #ff9900; box-shadow: 0 0 30px rgba(255,153,0,0.2); }
+.artifact-modal .modal-content.quality-B { border-color: #00ccff; box-shadow: 0 0 30px rgba(0,204,255,0.2); }
+
+.artifact-modal .close-btn {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.05);
+    border: none;
+    border-radius: 50%;
+    font-size: 20px;
+    color: var(--gold);
+    transition: all 0.2s;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.artifact-modal .close-btn:hover {
+    background: var(--gold);
+    color: #000;
+}
+
+.artifact-modal .modal-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 0;
+}
+
+.artifact-modal .art-icon-large {
+    font-size: 64px;
+    margin-bottom: 15px;
+    filter: drop-shadow(0 0 10px rgba(255,255,255,0.1));
+}
+
+.artifact-modal .header-text {
+    text-align: center;
+}
+
+.artifact-modal .art-quality-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.artifact-modal .header-text h3 {
+    font-size: 24px;
+    background: linear-gradient(to bottom, #fff, #aaa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+}
+
+.artifact-modal .modal-body {
+    background: rgba(255,255,255,0.03);
+    margin: 20px -24px;
+    padding: 30px 24px;
+    text-align: center;
+}
+
+.artifact-modal .art-desc {
+    font-size: 16px;
+    color: #eee;
+    line-height: 1.6;
+    margin-bottom: 16px;
+}
+
+.artifact-modal .art-type {
+    font-size: 12px;
+    color: var(--gold);
+    text-transform: uppercase;
+    opacity: 0.6;
+    margin-top: 10px;
+}
+
+.artifact-modal .modal-decoration {
+    position: absolute;
+    right: -20px;
+    bottom: 20px;
+    font-family: serif;
+    font-weight: 900;
+    font-size: 60px;
+    opacity: 0.03;
+    pointer-events: none;
+    transform: rotate(-10deg);
+    color: #fff;
+}

@@ -16,7 +16,7 @@
 // 1. CONFIG & CONSTANTS
 // =============================================================================
 const CONFIG = {
-    VERSION: '2.12.3',
+    VERSION: '2.14.0',
     CARD_VALUES: {
         'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
         'J': 10, 'Q': 10, 'K': 10, 'JOKER': 0
@@ -153,6 +153,20 @@ const CONFIG = {
             }
         }
     },
+    // [NEW] 神器配置 (v2.13.0)
+    ARTIFACTS: {
+        '001': { id: '001', name: '战鼓', icon: '🥁', desc: '在伤害计算阶段，额外增加 1 点伤害', quality: 'B', type: 'COMBAT' },
+        '002': { id: '002', name: '磨刀石', icon: '🛠️', desc: '手中卡牌面值 +1 (最大 10)', quality: 'B', type: 'COMBAT' },
+        '003': { id: '003', name: '破甲箭', icon: '🏹', desc: '暴击伤害倍率由 2 提升至 3', quality: 'A', type: 'COMBAT' },
+        '004': { id: '004', name: '圣盾', icon: '🛡️', desc: '护盾效果提升：单人模式 1.5 倍(封顶)，多人模式对全队生效', quality: 'A', type: 'COMBAT' },
+        '005': { id: '005', name: '复活十字架', icon: '✝️', desc: '单人模式：增加一次复活机会', quality: 'S', type: 'RULE' },
+        '006': { id: '006', name: '魔法背包', icon: '🎒', desc: '手牌上限 +2', quality: 'A', type: 'RULE' },
+        '007': { id: '007', name: '聚能环', icon: '💍', desc: '方片溢出的卡牌将回流至酒馆底', quality: 'S', type: 'RULE' },
+        '008': { id: '008', name: '幸运金币', icon: '🪙', desc: '击杀 Boss 获得的神器数量 +1', quality: 'A', type: 'RULE' }
+    },
+    ARTIFACT_QUALITY_WEIGHTS: {
+        'S': 10, 'A': 30, 'B': 60
+    },
     // 升级 EXP 阈值 (v2.12.0 重构：胜获 5 经验，败获 1 经验)
     UPGRADE_REQUIREMENTS: {
         lv2: 5,  // 对应之前的 1 胜
@@ -241,9 +255,14 @@ const CONFIG = {
             READY: '准备就绪',
             START: '游戏开始，祝你好运！',
             DRAW_START: '游戏开始，玩家获得初始手牌',
+            PLAYER_ACTION: '玩家 {name} 出牌: {cards}',
+            COMBO_INFO: '{type}: {info}',
             SKILL_SPADE: '♠ 触发：增加护盾点数 {val}',
             SKILL_DIAMOND: '♦ 触发：请求补给 {req} 张（实际入手 {act}）',
+            SKILL_DIAMOND_TEAM: '♦ 补给：全队依次获得 {act} 张卡牌{overflow}',
             SKILL_HEART: '♥ 触发：从墓地回收 {val} 张卡牌',
+            SKILL_CLUB: '♣ 触发：伤害判定翻倍',
+            SKILL_IMMUNE: '{suit}技能被免疫',
             BOSS_DAMAGED: 'Boss 受到 {val} 点伤害',
             PURIFY: '✨ Boss 已被感化并加入酒馆！',
             BOSS_DEFEATED: '💀 Boss 被击败了！',
@@ -251,7 +270,38 @@ const CONFIG = {
             DEFENSE_SUCCESS: '🛡️ 防御成功！',
             DEFENSE_FAIL: '💥 防御失败！',
             USE_JOKER: '🃏 使用 Joker：Boss 技能失效，重置手牌！',
-            OVERFLOW_DECK: '♻️ 触发【回流】：{count} 张溢出牌回流至酒馆底。'
+            OVERFLOW_DECK: '♻️ 触发【回流】：{count} 张溢出牌回流至酒馆底。',
+            SKILLS: {
+                ASSASSIN: {
+                    BACKSTAB: '🗡️ 刺客【背刺】：{msg}！点数翻倍至 {dmg}',
+                    CHAIN_KILL: '🗡️ 刺客【连杀】：绝命一击！准备补给资源...',
+                    CHAIN_KILL_DONE: '🗡️ 【连杀】完成：获得了 {rewards} 张手牌奖励',
+                    DEATH_MARK: '🎯 触发【死亡标记】：全部手牌附带 ♣ 效果（伤害翻倍/标记增幅）！',
+                    DEATH_MARK_ACTIVE: '🎯 [{name}] 发动【死亡标记】：Boss 已被标记！'
+                },
+                MONK: {
+                    BRACING_PUNCH: '👊 武僧【震慑拳】：连招爆发！突破 10 点上限，当前上限 {limit} 点'
+                },
+                ZHAO_YUN: {
+                    LONG_DAN_SWAP: '🐉 赵云【龙胆】：{from}触发{to}判定（{effect}）！',
+                    LONG_DAN_IGNORE: '🐉 赵云【龙胆】：无视 Boss 的 {suit} 技能免疫！'
+                },
+                GAMBLER: {
+                    PREPARE: '🎲 赌徒【孤注一掷】准备判定：出牌参照为 {card}',
+                    SUCCESS: '🎲 赌徒【孤注一掷】：判定成功！捕获了 {card}',
+                    FAIL: '🎲 赌徒【孤注一掷】：可惜，花色/点数不匹配',
+                    EMPTY: '🎲 赌徒【孤注一掷】：酒馆已无卡牌',
+                    GREEN_WAVE: '🎲 赌徒【无限绿波】：连环触发！再次捕获 {card}'
+                },
+                BARD: {
+                    HAND_OF_GOD: '🎶 吟游诗人【万能之手】：洗牌完成，重抽了 {count} 张卡牌'
+                },
+                ALCHEMIST: {
+                    EXCHANGE: '⚗️ 炼金术士【等价交换】：用 {hand} 换回了墓地的 {grave}',
+                    SAGE_STONE: '✨ 【贤者之石】共振：花色相同，额外抽 1 张牌！',
+                    ULT: '🏺 炼金术士【大炼成阵】：禁忌炼金！全场资源重组，获得新生命！'
+                }
+            }
         },
         NOTIFICATIONS: {
             START_TOAST: '游戏开始！请选择操作...',
@@ -267,9 +317,24 @@ const CONFIG = {
             DEFENSE_TITLE: '⚔️ 承受攻击',
             DEFENSE_REQ: '需求',
             DEFENSE_CUR: '当前',
+            ARTIFACT_DROP: '🎁 Boss 掉落了神器：{name}！',
+            ARTIFACT_CLAIM: '✨ {player} 获得了神器：{name}',
+            RESURRECT_TOAST: '✨ 【复活十字架】触发！你获得了第二次机会！',
             ONLINE_WIP: '联机模式即将开启！',
             ACHIEVEMENTS_WIP: '成就系统开发中...',
-            CHAR_UPGRADE: '⬆️ 角色升级！当前等级: Lv.{lv}'
+            CHAR_UPGRADE: '⬆️ 角色升级！当前等级: Lv.{lv}',
+            SKILL_ALCHEMIST: {
+                EXCHANGE_USED: '⚗️ 本回合等价交换次数已用完',
+                EXCHANGE_SELECT: '⚗️ 等价交换：请精确选择 1 张手牌',
+                EXCHANGE_DONE: '⚗️ 等价交换完成',
+                EXCHANGE_PROMPT: '⚗️ 请先选择 1 张手牌进行等价交换',
+                ULT_LIMIT: '⚗️ 大炼成阵每局仅限使用一次',
+                ULT_DONE: '🔮 大炼成阵！生命在于循环'
+            },
+            SKILL_ASSASSIN: {
+                MARK_USED: '🎯 本回合标记次数已耗尽',
+                MARK_DONE: '🎯 目标已锁定！所有手牌附带翻倍效果'
+            }
         },
         BUTTONS: {
             PLAY: '发动攻击',
@@ -304,15 +369,13 @@ let selectedAIs = [];
 const elements = {
     gameBoard: document.querySelector('.game-board'),
     phaseIndicator: document.getElementById('phaseIndicator'),
-    // playerInfo 已移除
     currentBoss: document.getElementById('currentBoss'),
     bossHealthFill: document.getElementById('bossHealthFill'),
     bossHealthText: document.getElementById('bossHealthText'),
     bossAttack: document.getElementById('bossAttack'),
     bossSuit: document.getElementById('bossSuit'),
     bossRank: document.getElementById('bossRank'),
-    bossImmunity: document.getElementById('bossImmunity'), // 新增免疫角标
-    // bossShield: document.getElementById('bossShield'), // 组件已移除 (v2.7.1)
+    bossImmunity: document.getElementById('bossImmunity'), 
     bossDeckCount: document.getElementById('bossDeckCount'),
     playerDeckCount: document.getElementById('playerDeckCount'),
     discardCount: document.getElementById('discardCount'),
@@ -420,6 +483,24 @@ const ProgressionTracker = {
 // =============================================================================
 // 3. UTILS & HELPERS
 // =============================================================================
+// [NEW] 获取受到神器影响后的实际数值 (v2.13.0)
+function getEffectiveCardValue(card, specificPlayer = null) {
+    if (!gameState || !gameState.players) return CONFIG.CARD_VALUES[card.rank];
+    const player = specificPlayer || gameState.players[gameState.currentPlayerIndex];
+    if (!player) return CONFIG.CARD_VALUES[card.rank];
+    
+    // 如果卡牌已经有“打出值”，优先使用（用于场上的黑桃护盾）
+    if (card.playedValue !== undefined) return card.playedValue;
+
+    const has002 = player.artifacts && player.artifacts.some(a => a.id === '002');
+    const baseValue = CONFIG.CARD_VALUES[card.rank];
+    
+    if (has002 && !card.isBoss && card.rank !== 'A') {
+        return Math.min(10, baseValue + 1);
+    }
+    return baseValue;
+}
+
 // 创建卡牌 DOM 元素
 function createCardElement(card, isSmall = false) {
     const el = document.createElement('div');
@@ -605,6 +686,7 @@ function initGame() {
         charId: charId,
         level: gameState.character.level,
         hand: [],
+        artifacts: [], // [NEW] 神器列表 (v2.13.0)
         maxHandSize: getFinalHandSize(charId)
     }];
 
@@ -624,6 +706,7 @@ function initGame() {
             maxCharges: aiCharData.skills.charges(level),
             skillResetType: aiCharData.skills.resetType(level),
             hand: [],
+            artifacts: [], // [NEW] 神器列表 (v2.13.0)
             maxHandSize: getFinalHandSize(aiCharId)
         });
     });
@@ -643,6 +726,7 @@ function initGame() {
         playerDeck: playerDeck,
         discardPile: [],
         fieldCards: [],
+        resurrectUsed: false, // [NEW] 复活神器标记 (v2.13.0)
         isYielding: false, 
         currentTurnActionCount: 0, // [NEW] 追踪本回合行动次数 (v2.9.0)
         currentBoss: {
@@ -766,13 +850,13 @@ function validateCombo(cards) {
         if (hasAce && hasNonAce) return true;
     }
     if (cards.length >= 2) {
-        const firstValue = cards[0].value;
-        const allSameValue = cards.every(card => card.value === firstValue);
-        const totalValue = cards.reduce((sum, card) => sum + card.value, 0);
+        const player = gameState.players[gameState.currentPlayerIndex];
+        const firstEffValue = getEffectiveCardValue(cards[0]);
+        const allSameValue = cards.every(card => getEffectiveCardValue(card) === firstEffValue);
+        const totalValue = cards.reduce((sum, card) => sum + getEffectiveCardValue(card), 0);
         const noAces = cards.every(card => card.rank !== 'A');
 
         // [NEW] 武僧：突破连招上限 (v2.9.8)
-        const player = gameState.players[gameState.currentPlayerIndex];
         let comboLimit = 10;
         if (player.charId === 'MONK') {
             const lv = player.level || 1;
@@ -781,7 +865,7 @@ function validateCombo(cards) {
             else comboLimit = 15;
         }
 
-        if (allSameValue && totalValue <= comboLimit && noAces && firstValue >= 2) return true;
+        if (allSameValue && totalValue <= comboLimit && noAces && firstEffValue >= 2) return true;
     }
     return false;
 }
@@ -793,58 +877,59 @@ function executeCombo(cards) {
     let comboSkills = new Set();
 
     const cardNames = cards.map(card => `${card.suit}${card.rank}`).join('+');
-    addLogEntry(`玩家 ${player.name} 出牌: ${cardNames}`, 'skill');
+    addLogEntry(CONFIG.UI_TEXT.LOGS.PLAYER_ACTION.replace('{name}', player.name).replace('{cards}', cardNames), 'skill');
     playSound('playCard');
 
     cards.forEach(card => {
+        delete card.playedValue; // 清除打出加成状态 (v2.13.0)
         const index = player.hand.findIndex(c => c.id === card.id);
         if (index !== -1) player.hand.splice(index, 1);
     });
 
     if (cards.length === 1) {
-        comboDamage = cards[0].value;
+        comboDamage = getEffectiveCardValue(cards[0]);
         // [NEW] 刺客【背刺】逻辑 (v2.11.0)
         if (player.charId === 'ASSASSIN' && player.level >= 1 && gameState.currentTurnActionCount === 0 && cards[0].suit === '♣') {
             comboDamage *= 2;
-            addLogEntry(`🗡️ 刺客【背刺】：首张 ♣ 命中核心！点数翻倍至 ${comboDamage}`, 'skill');
+            addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ASSASSIN.BACKSTAB.replace('{msg}', '首张 ♣ 命中核心').replace('{dmg}', comboDamage), 'skill');
         }
         comboSkills.add(cards[0].suit);
         comboType = '单张';
     } else if (cards.length === 2 && cards.some(c => c.rank === 'A')) {
         const aceCard = cards.find(c => c.rank === 'A');
         const otherCard = cards.find(c => c.rank !== 'A');
-        comboDamage = 1 + otherCard.value;
+        comboDamage = getEffectiveCardValue(aceCard) + getEffectiveCardValue(otherCard);
         // [NEW] 刺客【背刺】对宠物组合的支持
         if (player.charId === 'ASSASSIN' && player.level >= 1 && gameState.currentTurnActionCount === 0 && cards.some(c => c.suit === '♣')) {
              comboDamage *= 2; // 简化为全额翻倍
-             addLogEntry(`🗡️ 刺客【背刺】：宠物突袭！点数翻倍至 ${comboDamage}`, 'skill');
+             addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ASSASSIN.BACKSTAB.replace('{msg}', '宠物突袭').replace('{dmg}', comboDamage), 'skill');
         }
         comboSkills.add(aceCard.suit);
         comboSkills.add(otherCard.suit);
         comboType = '宠物组合';
-        addLogEntry(`宠物组合: ${aceCard.suit}${aceCard.rank} + ${otherCard.suit}${otherCard.rank}`, 'skill');
+        addLogEntry(CONFIG.UI_TEXT.LOGS.COMBO_INFO.replace('{type}', comboType).replace('{info}', `${aceCard.suit}${aceCard.rank} + ${otherCard.suit}${otherCard.rank}`), 'skill');
     } else {
-        comboDamage = cards.reduce((sum, card) => sum + card.value, 0);
+        comboDamage = cards.reduce((sum, card) => sum + getEffectiveCardValue(card), 0);
         // [NEW] 刺客【背刺】对连招的支持
         if (player.charId === 'ASSASSIN' && player.level >= 1 && gameState.currentTurnActionCount === 0 && cards[0].suit === '♣') {
             comboDamage *= 2;
-            addLogEntry(`🗡️ 刺客【背刺】：潜行突刺！点数翻倍至 ${comboDamage}`, 'skill');
+            addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ASSASSIN.BACKSTAB.replace('{msg}', '潜行突刺').replace('{dmg}', comboDamage), 'skill');
         }
         cards.forEach(card => comboSkills.add(card.suit));
         comboType = '连招';
-        addLogEntry(`连招: ${cards.length}张${cards[0].rank}`, 'skill');
+        addLogEntry(CONFIG.UI_TEXT.LOGS.COMBO_INFO.replace('{type}', comboType).replace('{info}', `${cards.length}张${cards[0].rank}`), 'skill');
 
         // [NEW] 武僧：突破限制展示 (v2.10.4)
         if (player.charId === 'MONK' && comboDamage > 10) {
             const limit = player.level >= 3 ? 40 : (player.level >= 2 ? 20 : 15);
-            addLogEntry(`👊 武僧【震慑拳】：连招爆发！突破 10 点上限，当前上限 ${limit} 点`, 'skill');
+            addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.MONK.BRACING_PUNCH.replace('{limit}', limit), 'skill');
         }
     }
 
     // [NEW] 刺客【死亡标记】判定 (v2.11.0)
     if (gameState.currentBoss.isMarked) {
         comboSkills.add('♣');
-        addLogEntry('🎯 触发【死亡标记】：全部手牌附带 ♣ 效果（伤害翻倍/标记增幅）！', 'skill');
+        addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ASSASSIN.DEATH_MARK, 'skill');
     }
 
     // [NEW] 赵云被动逻辑：花色转换详细日志 (v2.10.4)
@@ -854,19 +939,19 @@ function executeCombo(cards) {
             if (player.level >= 1) {
                 if (suit === '♠' && !comboSkills.has('♣')) {
                     comboSkills.add('♣');
-                    addLogEntry('🐉 赵云【龙胆】：黑桃触发梅花判定（伤害翻倍）！', 'skill');
+                    addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ZHAO_YUN.LONG_DAN_SWAP.replace('{from}', '黑桃').replace('{to}', '梅花').replace('{effect}', '伤害翻倍'), 'skill');
                 } else if (suit === '♣' && !comboSkills.has('♠')) {
                     comboSkills.add('♠');
-                    addLogEntry('🐉 赵云【龙胆】：梅花触发黑桃判定（获得护盾）！', 'skill');
+                    addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ZHAO_YUN.LONG_DAN_SWAP.replace('{from}', '梅花').replace('{to}', '黑桃').replace('{effect}', '获得护盾'), 'skill');
                 }
             }
             if (player.level >= 2) {
                 if (suit === '♥' && !comboSkills.has('♦')) {
                     comboSkills.add('♦');
-                    addLogEntry('🐉 赵云【龙胆】：红桃触发方片判定（全队补给）！', 'skill');
+                    addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ZHAO_YUN.LONG_DAN_SWAP.replace('{from}', '红桃').replace('{to}', '方片').replace('{effect}', '全队补给'), 'skill');
                 } else if (suit === '♦' && !comboSkills.has('♥')) {
                     comboSkills.add('♥');
-                    addLogEntry('🐉 赵云【龙胆】：方片触发红桃判定（回复生命）！', 'skill');
+                    addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ZHAO_YUN.LONG_DAN_SWAP.replace('{from}', '方片').replace('{to}', '红桃').replace('{effect}', '回复生命'), 'skill');
                 }
             }
         });
@@ -880,28 +965,33 @@ function executeCombo(cards) {
         const isZhaoYunLv3 = player.charId === 'ZHAO_YUN' && player.level >= 3;
         
         if (!isZhaoYunLv3 && gameState.currentBoss.currentBoss.suit === suit && !gameState.currentBoss.isSpecialDisabled) {
-            addLogEntry(`${suit}技能被免疫`, 'error');
+            addLogEntry(CONFIG.UI_TEXT.LOGS.SKILL_IMMUNE.replace('{suit}', suit), 'error');
             return;
         }
 
         if (isZhaoYunLv3 && gameState.currentBoss.currentBoss.suit === suit && !gameState.currentBoss.isSpecialDisabled) {
-            addLogEntry(`🐉 赵云【龙胆】：无视 Boss 的 ${suit} 技能免疫！`, 'skill');
+            addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ZHAO_YUN.LONG_DAN_IGNORE.replace('{suit}', suit), 'skill');
         }
 
         switch (suit) {
             case '♣':
-                finalDamage *= 2;
-                skillEffects.push('暴击x2');
+                // [NEW] 神器 003：破甲箭 (v2.13.0)
+                const critRatio = (player.artifacts && player.artifacts.some(a => a.id === '003')) ? 3 : 2;
+                finalDamage *= critRatio;
+                skillEffects.push(`暴击x${critRatio}`);
                 playSound('crit');
-                addLogEntry('♣ 触发：伤害判定翻倍', 'skill');
+                addLogEntry(CONFIG.UI_TEXT.LOGS.SKILL_CLUB, 'skill');
                 break;
             case '♠':
                 // [MOD] 赵云龙胆：♣ 视作 ♠ (v2.9.4)
                 const isZhaoYunSpadeSwapped = player.charId === 'ZHAO_YUN' && player.level >= 1;
                 const spadeCards = cards.filter(c => c.suit === '♠' || (isZhaoYunSpadeSwapped && c.suit === '♣'));
                 
-                spadeCards.forEach(card => gameState.fieldCards.push(card));
-                const spadesPower = spadeCards.reduce((sum, c) => sum + c.value, 0);
+                spadeCards.forEach(card => {
+                    card.playedValue = getEffectiveCardValue(card, player); // 记录打出时的加成值 (v2.13.0)
+                    gameState.fieldCards.push(card);
+                });
+                const spadesPower = spadeCards.reduce((sum, c) => sum + getEffectiveCardValue(c, player), 0);
                 skillEffects.push(`护盾+${spadesPower}`);
                 if (spadesPower > 0) playSound('shield');
                 addLogEntry(CONFIG.UI_TEXT.LOGS.SKILL_SPADE.replace('{val}', spadesPower), 'skill');
@@ -913,39 +1003,40 @@ function executeCombo(cards) {
                 let overflowCountTotal = 0;
                 let cardsRemaining = drawCount;
                 const playersCount = gameState.players.length;
-                let playerOffset = 0;
 
-                while (cardsRemaining > 0 && gameState.playerDeck.length > 0) {
-                    const allFull = gameState.players.every(p => p.hand.length >= p.maxHandSize);
-                    if (allFull) {
-                        while (cardsRemaining > 0 && gameState.playerDeck.length > 0) {
-                            const overflowCard = gameState.playerDeck.pop();
-                            if (gameState.character && gameState.character.overflowToDeck) {
-                                gameState.playerDeck.unshift(overflowCard);
-                            } else {
-                                gameState.discardPile.push(overflowCard);
-                            }
-                            overflowCountTotal++;
-                            cardsRemaining--;
-                        }
-                        break;
-                    }
-
-                    const targetIdx = (gameState.currentPlayerIndex + playerOffset) % playersCount;
+                // [MOD] 方片补给：依次补满玩家手牌 (v2.13.2)
+                for (let i = 0; i < playersCount; i++) {
+                    const targetIdx = (gameState.currentPlayerIndex + i) % playersCount;
                     const targetPlayer = gameState.players[targetIdx];
-                    if (targetPlayer.hand.length < targetPlayer.maxHandSize) {
+                    
+                    while (cardsRemaining > 0 && gameState.playerDeck.length > 0 && targetPlayer.hand.length < targetPlayer.maxHandSize) {
                         const drawnCard = gameState.playerDeck.pop();
                         targetPlayer.hand.push(drawnCard);
                         actualDrawsTotal++;
                         cardsRemaining--;
                     }
-                    playerOffset++;
+                    if (cardsRemaining <= 0 || gameState.playerDeck.length === 0) break;
                 }
+
+                // 处理盈余逻辑
+                if (cardsRemaining > 0 && gameState.playerDeck.length > 0) {
+                    while (cardsRemaining > 0 && gameState.playerDeck.length > 0) {
+                        const overflowCard = gameState.playerDeck.pop();
+                        const has007 = player.artifacts && player.artifacts.some(a => a.id === '007');
+                        if ((gameState.character && gameState.character.overflowToDeck) || has007) {
+                            gameState.playerDeck.unshift(overflowCard);
+                        } else {
+                            gameState.discardPile.push(overflowCard);
+                        }
+                        overflowCountTotal++;
+                        cardsRemaining--;
+                    }
+                }
+
                 skillEffects.push(`补给+${actualDrawsTotal}`);
                 if (actualDrawsTotal > 0 || overflowCountTotal > 0) playSound('draw');
-                let logMsg = `♦ 补给：全队依次获得 ${actualDrawsTotal} 张卡牌`;
-                if (overflowCountTotal > 0) logMsg += `，${overflowCountTotal} 张因手牌满溢出`;
-                addLogEntry(logMsg, 'skill');
+                let overflowMsg = overflowCountTotal > 0 ? `，${overflowCountTotal} 张因手牌满溢出` : '';
+                addLogEntry(CONFIG.UI_TEXT.LOGS.SKILL_DIAMOND_TEAM.replace('{act}', actualDrawsTotal).replace('{overflow}', overflowMsg), 'skill');
                 break;
             case '♥':
                 const recycleCount = Math.min(comboDamage, gameState.discardPile.length);
@@ -969,21 +1060,26 @@ function executeCombo(cards) {
         }
     });
 
+    // [NEW] 神器 001：战鼓 (v2.13.0)
+    if (player.artifacts && player.artifacts.some(a => a.id === '001')) {
+        finalDamage += 1;
+    }
+
     gameState.currentBoss.currentHP -= finalDamage;
     addLogEntry(CONFIG.UI_TEXT.LOGS.BOSS_DAMAGED.replace('{val}', finalDamage), 'skill');
     showScreenDamageEffect(finalDamage, comboType);
     updateFieldCards();
     updateShieldEffect();
 
+    updateUI();
+
     // [NEW] 赌徒：孤注一掷 (Draft v2.10.0)
     const activePlayer = gameState.players[gameState.currentPlayerIndex];
     if (activePlayer.charId === 'GAMBLER') {
         const lastCard = cards[cards.length - 1]; // 以最后一张为判定参照
-        addLogEntry(`🎲 赌徒【孤注一掷】准备判定：出牌参照为 ${lastCard.suit}${lastCard.rank}`, 'normal');
+        addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.GAMBLER.PREPARE.replace('{card}', `${lastCard.suit}${lastCard.rank}`), 'normal');
         triggerGamblerSkills(activePlayer, lastCard, 'ALL_IN');
     }
-
-    updateUI();
 
     if (gameState.currentBoss.currentHP <= 0) {
         const purified = gameState.currentBoss.currentHP === 0;
@@ -1002,7 +1098,7 @@ function executeCombo(cards) {
 
         // [NEW] 刺客【连杀】奖励 (v2.11.0)
         if (player.charId === 'ASSASSIN' && player.level >= 2 && comboSkills.has('♣')) {
-            addLogEntry('🗡️ 刺客【连杀】：绝命一击！准备补给资源...', 'skill');
+            addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ASSASSIN.CHAIN_KILL, 'skill');
             // 从酒馆和墓地各摸
             let rewards = 0;
             if (gameState.discardPile.length > 0) {
@@ -1014,12 +1110,15 @@ function executeCombo(cards) {
                 rewards++;
             }
             if (rewards > 0) {
-                addLogEntry(`🗡️ 【连杀】完成：获得了 ${rewards} 张手牌奖励`, 'skill');
+                addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ASSASSIN.CHAIN_KILL_DONE.replace('{rewards}', rewards), 'skill');
                 playSound('draw');
             }
         }
 
         setTimeout(() => {
+            // [NEW] 掉落神器 (v2.13.0)
+            dropArtifacts(gameState.currentBoss.currentBoss.rank);
+
             if (!nextBoss()) {
                 playSound('gameVictory'); // [NEW] 播放通关音效
                 showGameOver(true, CONFIG.UI_TEXT.NOTIFICATIONS.VICTORY);
@@ -1057,11 +1156,22 @@ function executeCombo(cards) {
 }
 
 function getTotalShieldValue() {
-    return gameState.fieldCards.reduce((sum, card) => sum + card.value, 0);
+    const rawShield = gameState.fieldCards.reduce((sum, card) => sum + getEffectiveCardValue(card), 0);
+    // [NEW] 神器 004：圣盾 (v2.13.0) 
+    // 文档：单人模式下护盾效果1.5倍(向下取整)；多人模式下已实装全局护盾，004不作额外提升。
+    if (gameState.players.length === 1) {
+        const has004 = gameState.players[0].artifacts && gameState.players[0].artifacts.some(a => a.id === '004');
+        if (has004) {
+            return Math.floor(rawShield * 1.5);
+        }
+    }
+    return rawShield;
 }
 
 function nextBoss() {
     if (gameState.bossDeck.length === 0) return false;
+    // 重置场上卡牌的打出状态 (防止回收后加成残留)
+    gameState.fieldCards.forEach(c => delete c.playedValue);
     gameState.discardPile.push(...gameState.fieldCards);
     gameState.fieldCards = [];
     const newBossCard = gameState.bossDeck.pop();
@@ -1089,6 +1199,14 @@ function nextBoss() {
         });
     }
 
+    // [NEW] 针对已有神器 006 (魔法背包) 的手牌上限修正 (v2.13.0)
+    gameState.players.forEach(p => {
+        const has006 = p.artifacts && p.artifacts.some(a => a.id === '006');
+        const baseLimit = CONFIG.HAND_LIMIT[gameState.players.length] || 5;
+        const gamblerBonus = (p.charId === 'GAMBLER' ? 2 : 0);
+        p.maxHandSize = baseLimit + gamblerBonus + (has006 ? 2 : 0);
+    });
+
     // [NEW] 动态设置 Boss 左上角水印 (v2.4.4)
     const suitNameMapEng = { '♣': 'club', '♠': 'spade', '♦': 'diamond', '♥': 'heart' };
     const suitEng = suitNameMapEng[newBossCard.suit];
@@ -1102,11 +1220,66 @@ function nextBoss() {
     return true;
 }
 
+/**
+ * [NEW] 神器掉落逻辑 (v2.13.0)
+ * 根据 Boss 等级掉落数量不同：J=1, Q=2, K=3
+ * 008 神器持有者额外 +1
+ */
+function dropArtifacts(bossRank) {
+    const baseCount = bossRank === 'J' ? 1 : (bossRank === 'Q' ? 2 : 3);
+    const defeater = gameState.players[gameState.currentPlayerIndex];
+    if (!defeater) return;
+    
+    const has008 = defeater.artifacts && defeater.artifacts.some(a => a.id === '008');
+    const totalCount = baseCount + (has008 ? 1 : 0);
+
+    for (let i = 0; i < totalCount; i++) {
+        // 分配机制：击败者优先，剩余按行动顺序（players 数组顺序循环）
+        const targetIdx = (gameState.currentPlayerIndex + i) % gameState.players.length;
+        const targetPlayer = gameState.players[targetIdx];
+
+        // 随机抽取一个神器（加权随机）
+        const newArtifact = getRandomArtifact();
+        if (newArtifact) {
+            if (!targetPlayer.artifacts) targetPlayer.artifacts = [];
+            targetPlayer.artifacts.push({ ...newArtifact }); // 拷贝一份
+            
+            // 立即生效部分属性
+            if (newArtifact.id === '006') {
+                targetPlayer.maxHandSize += 2;
+                drawCards(targetPlayer, 2);
+            }
+
+            addLogEntry(CONFIG.UI_TEXT.NOTIFICATIONS.ARTIFACT_CLAIM.replace('{player}', targetPlayer.name).replace('{name}', newArtifact.name), 'skill');
+            showToastMessage(`✨ 获得神器：${newArtifact.name}！`, 3000);
+        }
+    }
+}
+
+function getRandomArtifact() {
+    const pool = Object.values(CONFIG.ARTIFACTS);
+    const totalWeight = Object.values(CONFIG.ARTIFACT_QUALITY_WEIGHTS).reduce((a, b) => a + b, 0);
+    let rand = Math.random() * totalWeight;
+    
+    let targetQuality = 'B';
+    for (const [q, w] of Object.entries(CONFIG.ARTIFACT_QUALITY_WEIGHTS)) {
+        if (rand < w) {
+            targetQuality = q;
+            break;
+        }
+        rand -= w;
+    }
+
+    const filtered = pool.filter(a => a.quality === targetQuality);
+    if (filtered.length === 0) return pool[Math.floor(Math.random() * pool.length)];
+    return filtered[Math.floor(Math.random() * filtered.length)];
+}
+
 function confirmDefense() {
     selectedCardsForCombo = [];
     document.querySelectorAll('.card').forEach(cardEl => cardEl.classList.remove('selected'));
 
-    const totalValue = selectedCardsForDefense.reduce((sum, card) => sum + card.value, 0);
+    const totalValue = selectedCardsForDefense.reduce((sum, card) => sum + getEffectiveCardValue(card), 0);
     const requiredValue = gameState.currentBoss.currentATK;
 
     if (totalValue < requiredValue) {
@@ -1119,6 +1292,7 @@ function confirmDefense() {
         const player = gameState.players[gameState.currentPlayerIndex];
         const index = player.hand.findIndex(card => card.id === selectedCard.id);
         if (index !== -1) {
+            delete selectedCard.playedValue; // 确保弃牌时清除状态
             player.hand.splice(index, 1);
             gameState.discardPile.push(selectedCard);
         }
@@ -1415,6 +1589,19 @@ function updateUI() {
             if (elements.hudCharBadge) elements.hudCharBadge.style.display = 'flex';
             if (elements.hudCharPortrait) elements.hudCharPortrait.src = charData.portrait;
 
+            // [NEW] 渲染玩家神器 (v2.13.0)
+            const player = gameState.players[0];
+            const playerArtifactsEl = document.getElementById('playerArtifacts');
+            if (playerArtifactsEl) {
+                playerArtifactsEl.innerHTML = '';
+                if (player.artifacts) {
+                    player.artifacts.forEach(art => {
+                        const icon = createArtifactElement(art);
+                        playerArtifactsEl.appendChild(icon);
+                    });
+                }
+            }
+
             // 角色大立绘：作为战场护盾区右下角水印
             const battleLine = document.querySelector('.battle-line');
             if (battleLine) {
@@ -1671,9 +1858,63 @@ function updateTeammatesUI() {
                 <div class="tm-hand-icon"></div>
                 x ${ai.hand.length}
             </div>
+            <div class="tm-artifacts">
+                ${(ai.artifacts || []).map(art => `
+                    <div class="artifact-icon quality-${art.quality}" data-desc="${art.name}: ${art.desc}" onclick="showArtifactPopupByID('${art.id}')">${art.icon}</div>
+                `).join('')}
+            </div>
         `;
         elements.teammatesZone.appendChild(box);
     });
+}
+
+function createArtifactElement(artifact) {
+    const el = document.createElement('div');
+    el.className = `artifact-icon quality-${artifact.quality}`;
+    el.dataset.desc = `${artifact.name}: ${artifact.desc}`;
+    el.textContent = artifact.icon; // 使用配置的图标 (v2.13.3)
+    el.onclick = (e) => {
+        e.stopPropagation();
+        showArtifactPopup(artifact);
+    };
+    return el;
+}
+
+function showArtifactPopupByID(artId) {
+    const art = CONFIG.ARTIFACTS[artId];
+    if (art) showArtifactPopup(art);
+}
+
+function showArtifactPopup(art) {
+    const existing = document.querySelector('.artifact-modal');
+    if (existing) existing.remove();
+
+    const qualityNames = { 'S': '传说 / LEGENDARY', 'A': '史诗 / EPIC', 'B': '稀有 / RARE' };
+    const modal = document.createElement('div');
+    modal.className = 'artifact-modal';
+    modal.innerHTML = `
+        <div class="modal-content quality-${art.quality}">
+            <button class="close-btn">←</button> <!-- 返回按钮在左上角 -->
+            <div class="modal-header">
+                <div class="art-icon-large">${art.icon}</div>
+                <div class="header-text">
+                    <div class="art-quality-label">${qualityNames[art.quality]}</div>
+                    <h3>${art.name}</h3>
+                </div>
+            </div>
+            <div class="modal-body">
+                <p class="art-desc">${art.desc}</p>
+                <div class="art-type">TYPE: ${art.type}</div>
+            </div>
+            <div class="modal-decoration">ARTIFACT RECORD</div>
+        </div>
+    `;
+    modal.onclick = (e) => {
+        if (e.target === modal || e.target.classList.contains('close-btn')) {
+            modal.remove();
+        }
+    };
+    document.body.appendChild(modal);
 }
 
 function updateFieldCards() {
@@ -1791,7 +2032,7 @@ function showDamageEffect(damage, skillMessage = '') {
 function showDefensePanel() {
     const requiredValue = gameState.currentBoss.currentATK;
     const player = gameState.players[gameState.currentPlayerIndex];
-    const maxPossibleDefense = player.hand.reduce((sum, card) => sum + card.value, 0);
+    const maxPossibleDefense = player.hand.reduce((sum, card) => sum + getEffectiveCardValue(card), 0);
 
     if (maxPossibleDefense < requiredValue) {
         const failMsg = CONFIG.UI_TEXT.NOTIFICATIONS.DEFENSE_FAIL.replace('{defense}', maxPossibleDefense).replace('{atk}', requiredValue);
@@ -1831,7 +2072,7 @@ function selectCardForDefense(cardId) {
 }
 
 function updateDefenseValue() {
-    const totalValue = selectedCardsForDefense.reduce((sum, card) => sum + card.value, 0);
+    const totalValue = selectedCardsForDefense.reduce((sum, card) => sum + getEffectiveCardValue(card), 0);
     elements.currentDefenseValue.textContent = totalValue;
     elements.confirmDefenseBtn.disabled = totalValue < gameState.currentBoss.currentATK;
 }
@@ -1915,28 +2156,27 @@ function executeAlchemistSkill() {
     const player = gameState.players[0]; // 玩家
     if (selectedCardsForCombo.length > 0) {
         if (gameState.character.chargesLeft <= 0) {
-            showToastMessage('⚗️ 本回合等价交换次数已用完');
+            showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.SKILL_ALCHEMIST.EXCHANGE_USED);
             return;
         }
         if (selectedCardsForCombo.length !== 1) {
-            showToastMessage('⚗️ 等价交换：请精确选择 1 张手牌');
+            showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.SKILL_ALCHEMIST.EXCHANGE_SELECT);
             return;
         }
         const result = performEquivalentExchange(player, selectedCardsForCombo[0]);
         if (result) {
-            const suitMap = { '♣': '梅花', '♠': '黑桃', '♦': '方片', '♥': '红桃' };
-            showToastMessage('⚗️ 等价交换完成');
-            addLogEntry(`⚗️ 炼金术士【等价交换】：${suitMap[result.handCard.suit]}${result.handCard.rank} ↔ ${suitMap[result.graveCard.suit]}${result.graveCard.rank}`, 'skill');
+            showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.SKILL_ALCHEMIST.EXCHANGE_DONE);
+            addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ALCHEMIST.EXCHANGE.replace('{hand}', `${result.handCard.suit}${result.handCard.rank}`).replace('{grave}', `${result.graveCard.suit}${result.graveCard.rank}`), 'skill');
             playSound('draw');
         }
         selectedCardsForCombo = [];
     } else {
         if (gameState.character.level < 3) {
-            showToastMessage('⚗️ 请先选择 1 张手牌进行等价交换');
+            showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.SKILL_ALCHEMIST.EXCHANGE_PROMPT);
             return;
         }
         if (gameState.character.ultCharges <= 0) {
-            showToastMessage('⚗️ 大炼成阵每局仅限使用一次');
+            showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.SKILL_ALCHEMIST.ULT_LIMIT);
             return;
         }
         performGrandTransmutation(player);
@@ -1946,13 +2186,13 @@ function executeAlchemistSkill() {
 
 function executeAssassinSkill() {
     if (gameState.character.chargesLeft <= 0) {
-        showToastMessage('🎯 本回合标记次数已耗尽');
+        showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.SKILL_ASSASSIN.MARK_USED);
         return;
     }
     gameState.currentBoss.isMarked = true;
     gameState.character.chargesLeft--;
-    addLogEntry(`🎯 刺客发动【死亡标记】：当前 Boss ${gameState.currentBoss.currentBoss.suit}${gameState.currentBoss.currentBoss.rank} 已被标记！`, 'skill');
-    showToastMessage('🎯 目标已锁定！所有手牌附带翻倍效果');
+    addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ASSASSIN.DEATH_MARK_ACTIVE.replace('{name}', '玩家'), 'skill');
+    showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.SKILL_ASSASSIN.MARK_DONE);
     playSound('purify'); // 锁定音效
     updateUI();
 }
@@ -1967,7 +2207,7 @@ function executeAssassinSkillForAI(aiPlayer) {
             // 直接操作 AI 玩家状态，不借用人类玩家的 executeAssassinSkill
             gameState.currentBoss.isMarked = true;
             aiPlayer.chargesLeft--;
-            addLogEntry(`🎯 [${aiPlayer.name}] 发动【死亡标记】：Boss 已被标记！`, 'skill');
+            addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ASSASSIN.DEATH_MARK_ACTIVE.replace('{name}', aiPlayer.name), 'skill');
             updateUI();
             return true;
         }
@@ -1984,7 +2224,7 @@ function performEquivalentExchange(player, handCard) {
         gameState.discardPile.push(handCard);
         if (player.level >= 2 && handCard.suit === graveCard.suit) {
             drawCards(player, 1);
-            addLogEntry(`✨ 触发【贤者之石】：${player.name} 获得了额外抽牌！`, 'skill');
+            addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ALCHEMIST.SAGE_STONE, 'skill');
         }
         player.chargesLeft--;
         updateUI();
@@ -2001,8 +2241,8 @@ function performGrandTransmutation(player) {
     gameState.playerDeck = shuffleArray(gameState.playerDeck);
     drawCards(player, player.maxHandSize);
     
-    addLogEntry(`🔮 [${player.name}] 发动【大炼成阵】：全资源回流！`, 'skill');
-    showToastMessage('🔮 大炼成阵！生命在于循环');
+    addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.ALCHEMIST.ULT, 'skill');
+    showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.SKILL_ALCHEMIST.ULT_DONE);
     playSound('revive');
     updateUI();
 }
@@ -2018,9 +2258,9 @@ function executeAlchemistSkillForAI(aiPlayer) {
     // 2. 等价交换逻辑 (找回墓地高分牌)
     if (aiPlayer.chargesLeft > 0 && gameState.discardPile.length > 0) {
         const topGrave = gameState.discardPile[gameState.discardPile.length - 1];
-        if (topGrave.value >= 8) {
-            const trashCard = [...aiPlayer.hand].sort((a,b) => a.value - b.value)[0];
-            if (trashCard && trashCard.value < 5) {
+        if (topGrave.value >= 8) { // 墓地牌面值通常固定，但这里保持一致
+            const trashCard = [...aiPlayer.hand].sort((a,b) => getEffectiveCardValue(a) - getEffectiveCardValue(b))[0];
+            if (trashCard && getEffectiveCardValue(trashCard) < 5) {
                 return performEquivalentExchange(aiPlayer, trashCard) !== null;
             }
         }
@@ -2047,8 +2287,8 @@ function executeChosenOneSkillForPlayer(player) {
     if (player.chargesLeft !== undefined) player.chargesLeft--;
     else if (gameState.character && player === gameState.players[0]) gameState.character.chargesLeft--;
 
-    addLogEntry(`🃏 [${player.name}] 使用 Joker！Boss技能失效并重置手牌`, 'skill');
-    showToastMessage(`🃏 [${player.name}] 发动了 Joker！`);
+    addLogEntry(CONFIG.UI_TEXT.LOGS.USE_JOKER, 'skill');
+    showToastMessage(CONFIG.UI_TEXT.LOGS.USE_JOKER);
     playSound('purify');
     updateUI();
 }
@@ -2065,7 +2305,7 @@ function triggerGamblerSkills(player, baseCard, type) {
     const logTag = type === 'ALL_IN' ? '【孤注一掷】' : '【无限绿波】';
     
     if (gameState.playerDeck.length === 0) {
-        addLogEntry(`🎲 赌徒${logTag}：牌库已空，无法判定。`, 'normal');
+        addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.GAMBLER.EMPTY, 'normal');
         return;
     }
 
@@ -2084,7 +2324,8 @@ function triggerGamblerSkills(player, baseCard, type) {
             player.hand.push(drawn);
             
             const reason = suitMatch ? '花色相同' : '点数相同';
-            addLogEntry(`🎲 赌徒${logTag}：${compareDesc} -> 命中(${reason})！获得 ${drawn.suit}${drawn.rank}`, 'skill');
+            const logMsg = type === 'ALL_IN' ? CONFIG.UI_TEXT.LOGS.SKILLS.GAMBLER.SUCCESS : CONFIG.UI_TEXT.LOGS.SKILLS.GAMBLER.GREEN_WAVE;
+            addLogEntry(logMsg.replace('{card}', `${drawn.suit}${drawn.rank}`), 'skill');
             playSound('purify'); // 叮的一声感悟命运
             
             // LV1 只能触发一次，LV2+ 可递归（无限绿波）
@@ -2102,7 +2343,7 @@ function triggerGamblerSkills(player, baseCard, type) {
                 baseCard = drawn;
             }
         } else {
-            addLogEntry(`🎲 赌徒${logTag}：${compareDesc} -> 未命中。`, 'normal');
+            addLogEntry(CONFIG.UI_TEXT.LOGS.SKILLS.GAMBLER.FAIL, 'normal');
             isChaining = false;
         }
     }
@@ -2111,7 +2352,7 @@ function triggerGamblerSkills(player, baseCard, type) {
 
 function executeBardSkillForAI(player) {
     const immuneSuit = gameState.currentBoss.isSpecialDisabled ? null : gameState.currentBoss.currentBoss.suit;
-    const sorted = [...player.hand].sort((a,b) => a.value - b.value);
+    const sorted = [...player.hand].sort((a,b) => getEffectiveCardValue(a) - getEffectiveCardValue(b));
     const toDiscard = [];
     sorted.forEach(c => {
         if (c.rank !== 'A' && c.suit !== '♠') {
@@ -2182,6 +2423,72 @@ function showToastMessage(message, duration = 2000) {
 function showMessage(message) { console.log('Game Message:', message); }
 
 function showGameOver(isWin, message) {
+    if (!isWin) {
+        const player = gameState.players[gameState.currentPlayerIndex];
+        const art005Index = player.artifacts ? player.artifacts.findIndex(a => a.id === '005') : -1;
+
+        if (art005Index !== -1) {
+            if (gameState.players.length === 1) {
+                // 单人模式：满血复活
+                if (!gameState.resurrectUsed) {
+                    gameState.resurrectUsed = true;
+                    gameState.phase = 'TURN_START';
+                    player.hand.forEach(c => delete c.playedValue);
+                    gameState.discardPile.push(...player.hand);
+                    player.hand = [];
+
+                    drawCards(player, player.maxHandSize);
+                    showToastMessage(CONFIG.UI_TEXT.NOTIFICATIONS.RESURRECT_TOAST, 4000);
+                    addLogEntry('✨ 【复活十字架】生效，继续战斗！', 'skill');
+                    playSound('revive');
+                    updateUI();
+                    return;
+                }
+            } else {
+                // 多人模式：持有者死亡，顺移给下一位玩家，游戏继续
+                addLogEntry(`💀 ${player.name} 阵亡！【复活十字架】保佑了团队，游戏继续！`, 'error');
+                showToastMessage(`💀 ${player.name} 阵亡！【复活十字架】顺移。`, 4000);
+
+                const artifact005 = player.artifacts.splice(art005Index, 1)[0];
+
+                // 弃置手中牌
+                player.hand.forEach(c => delete c.playedValue);
+                gameState.discardPile.push(...player.hand);
+
+                // 将玩家移出队列
+                gameState.players.splice(gameState.currentPlayerIndex, 1);
+
+                if (gameState.players.length === 0) {
+                    // 全灭
+                    showGameOverReal(isWin, message);
+                    return;
+                }
+
+                if (gameState.currentPlayerIndex >= gameState.players.length) {
+                    gameState.currentPlayerIndex = 0;
+                }
+
+                const nextPlayer = gameState.players[gameState.currentPlayerIndex];
+                if (!nextPlayer.artifacts) nextPlayer.artifacts = [];
+                nextPlayer.artifacts.push(artifact005);
+                addLogEntry(`🎁 【复活十字架】已顺移至 ${nextPlayer.name}`, 'skill');
+
+                gameState.phase = 'TURN_START';
+                updateUI();
+                
+                if (nextPlayer.isAI && typeof triggerAITurn === 'function') {
+                    setTimeout(() => triggerAITurn(), window.aiDelay || 1500);
+                }
+                return;
+            }
+        }
+    }
+
+    showGameOverReal(isWin, message);
+}
+
+function showGameOverReal(isWin, message) {
+
     gameState.phase = 'GAME_OVER';
     elements.gameOverTitle.textContent = isWin ? '🎉 胜利！' : CONFIG.UI_TEXT.NOTIFICATIONS.DEFEAT;
     elements.gameOverMessage.textContent = message;
@@ -2372,9 +2679,54 @@ function handleAIOffense(aiPlayer) {
     if (!selectedCards || selectedCards.length === 0) {
         skipTurn();
     } else {
+        // ★ 生存性校验：出牌后能否抗住 Boss 反击？
+        if (!canSurviveAfterPlaying(aiPlayer, selectedCards)) {
+            addLogEntry(`[AI] ${aiPlayer.name} 评估后放弃出牌：剩余手牌无法抗住 Boss 反击，保存实力`, 'defense');
+            skipTurn();
+            return;
+        }
         executeCombo(selectedCards);
         updateUI();
     }
+}
+
+/**
+ * AI 生存性校验：出牌后剩余手牌能否抵挡 Boss 反击
+ * 如果能击杀 Boss（伤害 >= BossHP），则无需防御，直接通过
+ */
+function canSurviveAfterPlaying(aiPlayer, selectedCards) {
+    const immuneSuit = gameState.currentBoss.isSpecialDisabled ? null : gameState.currentBoss.currentBoss.suit;
+    const bossATK = gameState.currentBoss.currentATK;
+    const bossHP = gameState.currentBoss.currentHP;
+
+    // 计算这次出牌能造成的伤害（粗略估算，不考虑角色被动技能）
+    let dmg = selectedCards.reduce((s, c) => s + c.value, 0);
+    const hasClub = selectedCards.some(c => c.suit === '♣');
+    if (hasClub && immuneSuit !== '♣') dmg *= 2;
+
+    // 如果能击杀 Boss，不需要防御，直接放行
+    if (dmg >= bossHP) return true;
+
+    // 计算出牌后的有效 Boss 攻击力
+    let effectiveATK = bossATK;
+    // 已有护盾减免
+    const currentShield = getTotalShieldValue();
+    // 新出的黑桃牌也会加护盾（如果不免疫）
+    let newShield = 0;
+    if (immuneSuit !== '♠') {
+        newShield = selectedCards.filter(c => c.suit === '♠').reduce((s, c) => s + c.value, 0);
+    }
+    effectiveATK = Math.max(0, effectiveATK - currentShield - newShield);
+
+    // 如果 Boss 攻击被护盾完全抵消，无需防御
+    if (effectiveATK <= 0) return true;
+
+    // 计算出牌后剩余手牌总点数
+    const playedIds = new Set(selectedCards.map(c => c.id));
+    const remainingHand = aiPlayer.hand.filter(c => !playedIds.has(c.id));
+    const remainingValue = remainingHand.reduce((s, c) => s + c.value, 0);
+
+    return remainingValue >= effectiveATK;
 }
 
 function calculateAIOffense(hand, currentBoss, strategy, aiPlayer) {
